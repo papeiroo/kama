@@ -10,7 +10,7 @@ Strona salonu KamaGrooming (ul. Dworcowa 16B, Nakło nad Notecią) z kalendarzem
 | `template.html` | źródło strony – edytuj to, potem przebuduj |
 | `api/` | backend PHP: rezerwacje, wolne terminy, treści, Google Calendar |
 | `panel/` | panel administratora (`/panel/`) |
-| `img/`, `icons/` | zdjęcia, realizacje (przed/po), ikony PWA |
+| `img/`, `ikony/` | zdjęcia, realizacje (przed/po), ikony PWA |
 | `sw.js`, `manifest.webmanifest` | aplikacja na telefon (PWA) |
 | `tools/build.py` | wstrzykuje galerię z `api/gallery-default.json` do `index.html` |
 

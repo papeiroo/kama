@@ -1,0 +1,40 @@
+{
+  "name": "KamaGrooming – Salon Pielęgnacji Psów",
+  "short_name": "KamaGrooming",
+  "description": "Salon pielęgnacji psów w Nakle nad Notecią: usługi, cennik, realizacje i rezerwacja wizyt online.",
+  "lang": "pl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf6ee",
+  "theme_color": "#faf6ee",
+  "icons": [
+    {
+      "src": "ikony/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "ikony/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "ikony/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Umów wizytę",
+      "url": "./#rezerwacja"
+    },
+    {
+      "name": "Cennik",
+      "url": "./#cennik"
+    }
+  ]
+}

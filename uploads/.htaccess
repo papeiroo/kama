@@ -1,0 +1,10 @@
+# Tylko zdjęcia – żadnych skryptów
+Options -Indexes
+<FilesMatch "(?i)\.(php\d?|phtml|phar|pl|py|cgi|sh|shtml|htaccess)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+  <FilesMatch "(?i)\.(jpe?g)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>

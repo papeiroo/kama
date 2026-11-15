@@ -1,0 +1,9 @@
+# Pliki z hasłami i kodem pomocniczym nie są dostępne z przeglądarki
+<FilesMatch "^(config|lib|gcal)\.php$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+  Header set Cache-Control "no-store"
+  Header set X-Robots-Tag "noindex"
+</IfModule>
+Options -Indexes

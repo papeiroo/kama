@@ -1,0 +1,19 @@
+# dane dostępowe do bazy – nie wrzucać do repo
+api/config.php
+# bazy, cache i pliki wgrane przez panel
+*.db
+*.sqlite
+api/cache/*
+!api/cache/.htaccess
+!api/cache/.gitkeep
+uploads/**
+!uploads/.htaccess
+!uploads/.gitkeep
+!uploads/avatars/
+!uploads/avatars/.gitkeep
+.DS_Store
+Thumbs.db
+!uploads/gallery/
+!uploads/gallery/.gitkeep
+!uploads/certs/
+!uploads/certs/.gitkeep
