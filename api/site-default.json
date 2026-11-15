@@ -1,0 +1,250 @@
+{
+ "contact": {
+  "phone": "799 013 911",
+  "fb": "https://www.facebook.com/share/1Ejamk7F3v/",
+  "street": "ul. Dworcowa 16B",
+  "city": "89-100 Nakło nad Notecią"
+ },
+ "seo": {
+  "title": "KamaGrooming – Salon Pielęgnacji Psów",
+  "desc": "KamaGrooming – kameralny salon pielęgnacji psów w Nakle nad Notecią. Strzyżenie i stylizacja, kąpiele spa, ozonoterapia, wyczesywanie podszerstka, pielęgnacja uszu i pazurów. Rezerwacja online."
+ },
+ "img": {
+  "logo": "img/logo-emblem.png",
+  "icon": "ikony/icon-192.png",
+  "about": "img/salon.jpg",
+  "badge": "img/pies-kolko.jpg",
+  "inside": "img/wnetrze.jpg",
+  "entry": "img/salon.jpg"
+ },
+ "hide": [],
+ "t": {
+  "brand": "KamaGrooming",
+  "hero_small": "Salon pielęgnacji psów",
+  "hero_lead": "Kameralny salonik psiej urody w Nakle nad Notecią. Strzyżenie i stylizacja, kąpiele spa i ozonowe, wyczesywanie podszerstka oraz pielęgnacja uszu, oczu i pazurów. Z indywidualnym podejściem do każdego psa.",
+  "hero_btn1": "Umów wizytę ✦",
+  "hero_btn2": "Zobacz cennik",
+  "about_eye": "O salonie",
+  "about_h2": "Kameralny salonik *psiej urody*",
+  "inside_b": "Nasz salon",
+  "inside_cap": "Jasne, czyste i spokojne miejsce dla Twojego psa.",
+  "certs_eye": "Kwalifikacje",
+  "certs_h2": "Nasze *certyfikaty*",
+  "certs_lead": "Ukończone szkolenia i kursy groomerskie. Kliknij certyfikat, żeby go powiększyć.",
+  "svc_eye": "Usługi",
+  "svc_h2": "Nasze *usługi*",
+  "svc_lead": "Od szybkiej kąpieli po pełną stylizację. Nie wiesz, czego potrzebuje Twój pies? Doradzimy przy rezerwacji.",
+  "gal_eye": "Realizacje",
+  "gal_h2": "Nasi *pupile*",
+  "gal_lead": "Psiaki prosto ze stołu groomerskiego. Zobacz, jak wyglądały przed wizytą.",
+  "price_eye": "Cennik",
+  "price_h2": "Cennik *usług*",
+  "price_title": "Pielęgnacja psów",
+  "price_sub": "Cena zależy od wielkości psa",
+  "price_c0": "Usługa",
+  "price_c1": "Małe rasy",
+  "price_c2": "Duże rasy",
+  "price_extra": "Usługi dodatkowe",
+  "price_cta": "Wybierz termin",
+  "steps_eye": "Jak wygląda wizyta",
+  "steps_h2": "Od rezerwacji *do odbioru*",
+  "book_eye": "Rezerwacja online",
+  "book_h2": "Wybierz *termin wizyty*",
+  "book_lead": "Kliknij dostępny dzień, wybierz godzinę i zostaw kontakt. Zajęte terminy są przekreślone.",
+  "hours_h": "Godziny pracy",
+  "before_h": "Przed wizytą",
+  "rev_eye": "Opinie",
+  "rev_h2": "Co mówią *właściciele*",
+  "reg_eye": "Regulamin",
+  "reg_h2": "Regulamin *salonu*",
+  "reg_lead": "Kilka zasad, dzięki którym wizyta jest bezpieczna i komfortowa dla każdego psa.",
+  "reg_thanks": "Dziękujemy za zaufanie i do zobaczenia!",
+  "faq_eye": "Pytania",
+  "faq_h2": "Najczęstsze *pytania*",
+  "contact_eye": "Kontakt",
+  "contact_h2": "Zadzwoń *lub napisz*",
+  "contact_lead": "Wizytę umówisz telefonicznie, SMS-em, na Messengerze, WhatsAppie albo w kalendarzu powyżej.",
+  "c_tel": "W godzinach pracy salonu",
+  "c_sms": "Odpiszemy najszybciej, jak to możliwe",
+  "c_wa": "Napisz wiadomość",
+  "c_fb": "Aktualności, zdjęcia i opinie",
+  "map_eye": "Dojazd",
+  "map_h2": "Jak do nas *trafić*",
+  "map_lead": "Salon znajdziesz przy ul. Dworcowej 16B w Nakle nad Notecią. Szukaj szarego domku z szyldem „Salon pielęgnacji psów”.",
+  "entry_b": "Wejście do salonu",
+  "entry_cap": "Szary domek z numerem 16B i szyldem nad drzwiami.",
+  "in2_b": "W środku",
+  "in2_cap": "Jasne, czyste i spokojne miejsce dla Twojego psa.",
+  "foot_p": "Kameralny salonik psiej urody w Nakle nad Notecią.\nStrzyżenie • Kąpiel • Pielęgnacja • Ozonoterapia",
+  "copy": "KamaGrooming — Salon Pielęgnacji Psów",
+  "about_p": "KamaGrooming to kameralny salon pielęgnacji psów w Nakle nad Notecią. Każdego psa traktujemy indywidualnie: spokojnie go poznajemy, pytamy o zdrowie i przyzwyczajenia, a potem dobieramy kąpiel, kosmetyki i fryzurę do rasy, rodzaju sierści i charakteru pupila.\n\nPracujemy bez środków uspokajających, za to z dużą dozą cierpliwości. Stanowisko i narzędzia dezynfekujemy po każdym psie, a przy kąpieli możemy zastosować ozonoterapię, która oczyszcza skórę i łagodzi podrażnienia."
+ },
+ "l": {
+  "facts": [
+   {
+    "b": "100% poleca",
+    "s": "Sprawdź na Facebooku",
+    "link": "fb"
+   },
+   {
+    "b": "Ozonoterapia",
+    "s": "Kąpiele dla zdrowej skóry",
+    "link": ""
+   },
+   {
+    "b": "Bez sedacji",
+    "s": "Tylko spokój i cierpliwość",
+    "link": ""
+   }
+  ],
+  "marquee": [
+   "Strzyżenie & stylizacja",
+   "Wyczesywanie podszerstka",
+   "Kąpiele spa",
+   "Ozonoterapia",
+   "Pielęgnacja uszu i pazurów",
+   "Wizyty adaptacyjne szczeniąt",
+   "Nakło nad Notecią"
+  ],
+  "chips": [
+   "Strzyżenie & stylizacja",
+   "Kąpiele ozonowe",
+   "Wyczesywanie podszerstka",
+   "Szczenięta mile widziane"
+  ],
+  "services": [
+   {
+    "icon": "i-cut",
+    "title": "Strzyżenie & stylizacja",
+    "desc": "Fryzura dopasowana do rasy, sierści i Twoich oczekiwań. W cenie kąpiel, uszy i pazury.",
+    "list": "",
+    "price": "od 120 zł"
+   },
+   {
+    "icon": "i-comb",
+    "title": "Wyczesywanie podszerstka",
+    "desc": "Usuwamy martwy podszerstek, więc w domu mniej sierści, a pies lżej znosi upały.",
+    "list": "",
+    "price": "od 100 zł"
+   },
+   {
+    "icon": "i-bath",
+    "title": "Kąpiele spa",
+    "desc": "Kąpiel w kosmetykach dobranych do skóry i sierści, suszenie i rozczesanie. Pachnąco i miękko.",
+    "list": "",
+    "price": "od 70 zł"
+   },
+   {
+    "icon": "i-o3",
+    "title": "Kąpiele ozonowe",
+    "desc": "Zdrowsza skóra i lśniąca sierść.",
+    "list": "oczyszczają skórę i sierść\ndziałają antybakteryjnie\nłagodzą podrażnienia\nwspomagają leczenie problemów skórnych",
+    "price": "od 90 zł"
+   },
+   {
+    "icon": "i-care",
+    "title": "Uszy, oczy i pazury",
+    "desc": "Delikatne czyszczenie uszu i okolic oczu oraz skracanie pazurów. Także jako osobna usługa.",
+    "list": "",
+    "price": "od 20 zł"
+   },
+   {
+    "icon": "i-pup",
+    "title": "Wizyty adaptacyjne szczeniąt",
+    "desc": "Pierwsze, spokojne spotkania z salonem, wodą i suszarką, żeby pielęgnacja kojarzyła się dobrze.",
+    "list": "",
+    "price": "od 50 zł"
+   }
+  ],
+  "steps": [
+   {
+    "t": "Rezerwacja",
+    "d": "Wybierasz dzień i godzinę w kalendarzu poniżej albo dzwonisz, piszesz SMS, na Messengerze lub WhatsAppie."
+   },
+   {
+    "t": "Potwierdzenie",
+    "d": "Oddzwonimy lub napiszemy SMS-a, żeby potwierdzić termin i zakres usługi."
+   },
+   {
+    "t": "Przyjęcie psa",
+    "d": "Krótka rozmowa o potrzebach pupila, alergiach, chorobach i przyzwyczajeniach."
+   },
+   {
+    "t": "Pielęgnacja",
+    "d": "Kąpiel, strzyżenie i zabiegi w spokojnej atmosferze, bez obecności właściciela."
+   },
+   {
+    "t": "Odbiór",
+    "d": "Odbierasz pachnącego pupila i wskazówki, jak dbać o sierść do kolejnej wizyty."
+   }
+  ],
+  "hours": [
+   {
+    "d": "Poniedziałek – Piątek",
+    "h": "9:00 – 17:00"
+   },
+   {
+    "d": "Sobota",
+    "h": "9:00 – 13:00"
+   },
+   {
+    "d": "Niedziela",
+    "h": "nieczynne"
+   }
+  ],
+  "before": [
+   "Nie karm psa 2 h przed wizytą i zabierz go na spacer.",
+   "Powiedz nam o alergiach, chorobach, lekach i ewentualnej agresji psa.",
+   "Spóźnienie powyżej 15 min może skutkować odmową przyjęcia.",
+   "Odwołaj wizytę min. 24 h wcześniej."
+  ],
+  "reg": [
+   "Rezerwacja terminów: telefonicznie, Messenger, SMS, WhatsApp oraz online na tej stronie.",
+   "Odwołanie wizyty: minimum 24 h przed terminem.",
+   "Spóźnienie powyżej 15 min może skutkować odmową przyjęcia psa.",
+   "Nie karm psa 2 h przed wizytą i zapewnij mu spacer.",
+   "Stanowisko pracy i narzędzia każdorazowo są poddawane dezynfekcji.",
+   "W salonie usługi groomerskie wykonywane są bez podawania psom środków uspokajających.",
+   "Nie przyjmujemy suk w ciąży, karmiących oraz w cieczce.",
+   "Właściciel jest obowiązany poddawać psa wszystkim obowiązkowym szczepieniom.",
+   "Właściciel jest zobowiązany poinformować o alergiach, chorobach, lekach i agresji psa.",
+   "Usługi groomerskie wykonywane są bez obecności właściciela.",
+   "Możliwa jest publikacja zdjęć psa (brak zgody zgłoś wcześniej).",
+   "Odbioru psa dokonuje właściciel lub osoba wcześniej wskazana.",
+   "Pozostawienie psa jest równoznaczne z akceptacją regulaminu."
+  ],
+  "faq": [
+   {
+    "q": "Czy mogę zostać z psem podczas zabiegu?",
+    "a": "Usługi groomerskie wykonujemy bez obecności właściciela. Większość psów szybciej się wtedy wycisza i lepiej współpracuje. Zadzwonimy, kiedy pupil będzie gotowy do odbioru."
+   },
+   {
+    "q": "Czy podajecie psom środki uspokajające?",
+    "a": "Nie. W salonie pracujemy bez środków uspokajających, za to spokojnie i cierpliwie, z przerwami, jeśli pies ich potrzebuje."
+   },
+   {
+    "q": "Na czym polega kąpiel ozonowa?",
+    "a": "To kąpiel w wodzie wzbogaconej ozonem. Oczyszcza skórę i sierść, działa antybakteryjnie, łagodzi podrażnienia i wspomaga leczenie problemów skórnych. Sierść jest po niej zdrowsza i lśniąca."
+   },
+   {
+    "q": "Jak przygotować psa do wizyty?",
+    "a": "Nie karm psa 2 godziny przed wizytą i zabierz go na spacer. Przy przyjęciu powiedz nam o alergiach, chorobach, lekach i ewentualnej agresji. Pies powinien mieć aktualne obowiązkowe szczepienia."
+   },
+   {
+    "q": "Od kiedy szczeniak może przyjść do groomera?",
+    "a": "Zapraszamy szczenięta na wizyty adaptacyjne: krótkie spotkania, na których maluch poznaje salon, dźwięki suszarki i dotyk przy pielęgnacji. Dzięki temu kolejne wizyty są dla niego czystą przyjemnością."
+   },
+   {
+    "q": "Ile trwa wizyta?",
+    "a": "To zależy od wielkości psa, rodzaju i stanu sierści oraz zakresu usługi. Zwykle od ok. 1 do 3 godzin. Dokładny czas podamy przy potwierdzeniu wizyty."
+   }
+  ],
+  "fsvc": [
+   "Strzyżenie & stylizacja",
+   "Kąpiele spa i ozonowe",
+   "Wyczesywanie podszerstka",
+   "Uszy, oczy i pazury",
+   "Wizyty adaptacyjne"
+  ]
+ }
+}

@@ -1,5 +1,5 @@
 # Pliki z hasłami i kodem pomocniczym nie są dostępne z przeglądarki
-<FilesMatch "^(config|lib|gcal)\.php$">
+<FilesMatch "^(config|config\.example|lib|gcal)\.php$">
   Require all denied
 </FilesMatch>
 <IfModule mod_headers.c>

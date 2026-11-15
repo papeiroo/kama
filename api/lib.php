@@ -1,14 +1,65 @@
 <?php
 declare(strict_types=1);
 
+function cfg_file(): string { return is_file(__DIR__ . '/config.php') ? __DIR__ . '/config.php' : __DIR__ . '/config.example.php'; }
+function is_configured(): bool { $c = cfg(); return is_file(__DIR__ . '/config.php') && (($c['db']['dsn'] ?? '') !== '' || ($c['db']['name'] ?? 'NAZWA_BAZY') !== 'NAZWA_BAZY'); }
+
 function cfg(?string $key = null)
 {
     static $c = null;
     if ($c === null) {
-        $c = require (is_file(__DIR__ . '/config.php') ? __DIR__ . '/config.php' : __DIR__ . '/config.example.php');
+        $c = require cfg_file();
         date_default_timezone_set($c['timezone'] ?? 'Europe/Warsaw');
     }
-    return $key === null ? $c : ($c[$key] ?? null);
+    if ($key === null) return $c;
+    /* ustawienia zmieniane w panelu (Ustawienia / Treści strony) mają pierwszeństwo przed config.php */
+    if (in_array($key, ['notify_email', 'phone', 'address', 'google_ical_url', 'slot_minutes', 'days_ahead', 'min_notice_minutes', 'manage_hours'], true)) {
+        $o = cfg_overlay();
+        if (array_key_exists($key, $o) && $o[$key] !== '' && $o[$key] !== null) return $o[$key];
+    }
+    return $c[$key] ?? null;
+}
+function cfg_overlay(): array
+{
+    static $o = null; if ($o !== null) return $o;
+    $o = [];
+    try {
+        $j = json_decode((string)(setting('c_cfg') ?? ''), true); if (is_array($j)) $o = $j;
+        $s = site_get(); $ct = $s['contact'] ?? [];
+        if (!empty($ct['phone'])) $o['phone'] = $ct['phone'];
+        $addr = trim(implode(', ', array_filter([$ct['street'] ?? '', $ct['city'] ?? ''])));
+        if ($addr !== '') $o['address'] = $addr;
+    } catch (Throwable $e) {}
+    return $o;
+}
+
+/* ---------- TREŚCI STRONY (panel → „Treści strony”) ---------- */
+function site_default(): array
+{
+    static $d = null; if ($d !== null) return $d;
+    $d = json_decode((string)@file_get_contents(__DIR__ . '/site-default.json'), true);
+    if (!is_array($d)) $d = ['contact' => [], 'seo' => [], 'img' => [], 't' => [], 'l' => [], 'hide' => []];
+    return $d;
+}
+function site_get(): array
+{
+    $d = site_default();
+    try {
+        $o = json_decode((string)(setting('c_site') ?? ''), true);
+        if (is_array($o)) {
+            foreach (['contact', 'seo', 'img', 't', 'l'] as $k) if (isset($o[$k]) && is_array($o[$k])) $d[$k] = array_merge($d[$k] ?? [], $o[$k]);
+            if (isset($o['hide']) && is_array($o['hide'])) $d['hide'] = array_values($o['hide']);
+        }
+    } catch (Throwable $e) {}
+    return $d;
+}
+/* tylko to, co różni się od domyślnych – żeby zmiany w szablonie strony nie były blokowane przez stare zapisy */
+function site_save(array $s): void
+{
+    $d = site_default(); $o = [];
+    foreach (['contact', 'seo', 'img', 't', 'l'] as $k) foreach (($s[$k] ?? []) as $kk => $v) if (!array_key_exists($kk, $d[$k] ?? []) || $d[$k][$kk] !== $v) $o[$k][$kk] = $v;
+    $o['hide'] = array_values($s['hide'] ?? []);
+    setting('c_site', json_encode($o, JSON_UNESCAPED_UNICODE));
 }
 
 require_once __DIR__ . '/gcal.php';
@@ -226,7 +277,7 @@ function save_jpeg_dataurl(string $data, string $dir): ?string
 
 function delete_upload(string $rel): void
 {
-    if (!preg_match('#^uploads/(gallery|certs|avatars)/[0-9a-f-]+\.jpg$#', $rel)) return;
+    if (!preg_match('#^uploads/(gallery|certs|avatars|site)/[0-9a-f-]+\.jpg$#', $rel)) return;
     $f = dirname(__DIR__) . '/' . $rel;
     if (is_file($f)) @unlink($f);
 }

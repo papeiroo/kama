@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/../api/lib.php';
+require __DIR__ . '/site-editor.php';
+if (!is_configured()) { header('Location: ../api/install.php'); exit; }
 
 /* PANEL REZERWACJI KAMAGROOMING – logowanie hasłem ustawionym w api/install.php */
 header('X-Robots-Tag: noindex, nofollow');
@@ -23,6 +25,7 @@ function flash(?string $m = null): ?string { if ($m !== null) { $_SESSION['flash
 
 $error = '';
 try { $hash = setting('admin_hash'); } catch (Throwable $e) { $hash = null; $error = 'Brak połączenia z bazą. Sprawdź api/config.php i uruchom api/install.php.'; }
+if (!$hash && !$error) { header('Location: ../api/install.php'); exit; }
 
 /* ---------- logowanie (z blokadą po 5 błędach na 15 minut) ---------- */
 if (empty($_SESSION['auth'])) {
@@ -63,12 +66,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $back = preg_match('/^\?[a-z=&0-9-]*$/', $back) ? $back : '';
     try {
         switch ($a) {
-            case 'confirm':
-                db()->prepare("UPDATE bookings SET status = 'confirmed', chg_seen = 1 WHERE id = ? AND status <> 'cancelled'")->execute([$id]);
-                flash('Wizyta potwierdzona.'); break;
-            case 'cancel':
-                db()->prepare("UPDATE bookings SET status = 'cancelled', slot_key = NULL, chg_seen = 1 WHERE id = ?")->execute([$id]);
-                flash('Wizyta odwołana. Termin jest znów wolny.'); break;
+            case 'confirm': case 'cancel':
+                $st = db()->prepare('SELECT * FROM bookings WHERE id = ?'); $st->execute([$id]); $bk = $st->fetch();
+                if (!$bk) break;
+                if ($a === 'confirm') db()->prepare("UPDATE bookings SET status = 'confirmed', chg_seen = 1 WHERE id = ? AND status <> 'cancelled'")->execute([$id]);
+                else db()->prepare("UPDATE bookings SET status = 'cancelled', slot_key = NULL, chg_seen = 1 WHERE id = ?")->execute([$id]);
+                $mailed = false;
+                if (!empty($bk['email']) && $bk['status'] !== ($a === 'confirm' ? 'confirmed' : 'cancelled')) {
+                    $when = pl_date($bk['bdate']) . ', godz. ' . $bk['btime']; $sn = site_get(); $brand = $sn['t']['brand'] ?? 'KamaGrooming';
+                    $body = $a === 'confirm'
+                        ? "Dzień dobry,\n\npotwierdzamy wizytę: $when.\nAdres: " . cfg('address') . "\n\nW razie pytań: " . cfg('phone') . ".\nDo zobaczenia!\n$brand\n" . cfg('site_url') . "\n"
+                        : "Dzień dobry,\n\nniestety musimy odwołać wizytę: $when.\nZadzwoń lub napisz SMS, a znajdziemy inny termin: " . cfg('phone') . ".\nMożesz też wybrać nowy termin na stronie: " . cfg('site_url') . "/#rezerwacja\n\nPrzepraszamy i pozdrawiamy,\n$brand\n";
+                    $mailed = send_mail((string)$bk['email'], ($a === 'confirm' ? 'Wizyta potwierdzona: ' : 'Wizyta odwołana: ') . $when, $body, (string)cfg('notify_email'));
+                }
+                flash(($a === 'confirm' ? 'Wizyta zaakceptowana.' : 'Wizyta odwołana. Termin jest znów wolny.') . ($mailed ? ' Klient dostał e-mail.' : '')); break;
             case 'seen':
                 db()->prepare('UPDATE bookings SET chg_seen = 1 WHERE id = ?')->execute([$id]);
                 break;
@@ -191,6 +202,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 if ($a === 'rev_del') { if (!empty($list[$i]['img'])) delete_upload($list[$i]['img']); array_splice($list, $i, 1); flash('Opinia usunięta.'); }
                 else { $j = $i + ((($_POST['dir'] ?? '') === 'up') ? -1 : 1); if (isset($list[$j])) [$list[$i], $list[$j]] = [$list[$j], $list[$i]]; }
                 content_set('reviews', $list); break;
+            case 'site_save': case 'site_reset': case 'site_img': case 'set_pass': case 'set_cfg':
+                $m = strpos($a, 'site_') === 0 ? site_handle($a) : settings_handle($a);
+                if ($m !== null) flash($m); break;
             case 'logout':
                 $_SESSION = []; session_destroy(); go();
         }
@@ -221,6 +235,8 @@ $f = flash();
   <a href="?t=gallery" class="<?= $tab === 'gallery' ? 'on' : '' ?>">Galeria</a>
   <a href="?t=certs" class="<?= $tab === 'certs' ? 'on' : '' ?>">Certyfikaty</a>
   <a href="?t=reviews" class="<?= $tab === 'reviews' ? 'on' : '' ?>">Opinie</a>
+  <a href="?t=site" class="<?= $tab === 'site' ? 'on' : '' ?>">✏️ Treści strony</a>
+  <a href="?t=settings" class="<?= $tab === 'settings' ? 'on' : '' ?>">Ustawienia</a>
 </nav>
 <main class="wrap">
 <?php if ($f): ?><p class="flash"><?= h($f) ?></p><?php endif; ?>
@@ -230,16 +246,16 @@ $f = flash();
     try { $chgs = db()->query("SELECT * FROM bookings WHERE chg_seen = 0 AND chg IS NOT NULL ORDER BY chg_at DESC LIMIT 30")->fetchAll(); } catch (Throwable $e) {}
     if ($chgs): ?>
   <section class="chgbox">
-    <h2>Zmiany od klientek <span><?= count($chgs) ?></span></h2>
+    <h2>Zmiany od klientów <span><?= count($chgs) ?></span></h2>
     <?php foreach ($chgs as $c): $cf = $c['chg_from'] ? explode(' ', (string)$c['chg_from']) : null;
         $tel9 = substr(preg_replace('/\D/', '', (string)$c['phone']), -9);
         $sms = 'Dzień dobry, potwierdzam zmianę terminu – wizyta ' . pl_date($c['bdate']) . ' o godz. ' . $c['btime'] . '. Do zobaczenia! KamaGrooming'; ?>
     <div class="chg <?= h($c['chg']) ?>">
       <div class="chg-t">
         <?php if ($c['chg'] === 'cancel'): ?>
-          <b><?= h($c['name']) ?></b> odwołała wizytę <b><?= h(pl_date($c['bdate']) . ', ' . $c['btime']) ?></b>. Termin jest znów wolny.
+          <b><?= h($c['name']) ?></b> odwołuje wizytę <b><?= h(pl_date($c['bdate']) . ', ' . $c['btime']) ?></b>. Termin jest znów wolny.
         <?php else: ?>
-          <b><?= h($c['name']) ?></b> przełożyła wizytę<?php if ($cf && count($cf) === 2): ?> z <s><?= h(pl_date($cf[0]) . ', ' . $cf[1]) ?></s><?php endif; ?> na <b><?= h(pl_date($c['bdate']) . ', ' . $c['btime']) ?></b>.
+          <b><?= h($c['name']) ?></b> przekłada wizytę<?php if ($cf && count($cf) === 2): ?> z <s><?= h(pl_date($cf[0]) . ', ' . $cf[1]) ?></s><?php endif; ?> na <b><?= h(pl_date($c['bdate']) . ', ' . $c['btime']) ?></b>.
           <?= $c['status'] === 'cancelled' ? 'Wizyta jest już odwołana.' : 'Potwierdź nowy termin albo odwołaj wizytę.' ?>
         <?php endif; ?>
         <span class="chg-w"><?= h(date('d.m H:i', strtotime((string)$c['chg_at']))) ?><?php if ($tel9): ?> · <a href="tel:+48<?= h($tel9) ?>"><?= h(phone_pretty((string)$c['phone'])) ?></a><?php endif; ?></span>
@@ -251,6 +267,28 @@ $f = flash();
         <?php else: ?>
           <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="seen"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab ?? 'cal') ?>"><button class="btn sm">OK, przyjęłam</button></form>
         <?php endif; ?>
+      </div>
+    </div>
+    <?php endforeach; ?>
+  </section>
+<?php endif; ?>
+
+<?php
+    /* ---------- NOWE REZERWACJE DO AKCEPTACJI (na każdej zakładce, jak u Jagody: Akceptuj / Odwołaj) ---------- */
+    $pend = [];
+    if ($tab !== 'next') { try { $st = db()->prepare("SELECT * FROM bookings WHERE status = 'pending' AND bdate >= ? ORDER BY bdate, btime LIMIT 20"); $st->execute([$todayS]); $pend = $st->fetchAll(); } catch (Throwable $e) {} }
+    if ($pend): ?>
+  <section class="chgbox pend">
+    <h2>Nowe rezerwacje do akceptacji <span><?= count($pend) ?></span></h2>
+    <?php foreach ($pend as $r): $tel9 = substr(preg_replace('/\D/', '', (string)$r['phone']), -9);
+        $sms = 'Dzień dobry, potwierdzam wizytę ' . pl_date($r['bdate']) . ' o godz. ' . $r['btime'] . '. Do zobaczenia! KamaGrooming'; ?>
+    <div class="chg">
+      <div class="chg-t"><b><?= h(pl_date($r['bdate'])) ?>, <?= h($r['btime']) ?></b> · <?= h($r['name']) ?><?= !empty($r['pet']) ? ' · 🐶 ' . h($r['pet']) : '' ?><?= !empty($r['service']) ? '<span class="chg-w">' . h($r['service']) . '</span>' : '' ?>
+        <span class="chg-w"><?php if ($tel9): ?><a href="tel:+48<?= h($tel9) ?>">📞 <?= h(phone_pretty((string)$r['phone'])) ?></a><?php endif; ?><?= !empty($r['email']) ? ' · ' . h($r['email']) : '' ?></span></div>
+      <div class="acts">
+        <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><button class="btn sm">✓ Akceptuj</button></form>
+        <?php if ($tel9): ?><form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><a class="btn sm ghost csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">Akceptuj + SMS</a></form><?php endif; ?>
+        <details class="confirm"><summary class="btn sm danger">✕ Odwołaj</summary><form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="cancel"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><button class="btn sm danger">Tak, odwołaj wizytę</button></form></details>
       </div>
     </div>
     <?php endforeach; ?>
@@ -663,17 +701,19 @@ $f = flash();
     </form>
   </section>
 
+<?php elseif ($tab === 'site'): site_editor_view(); ?>
+<?php elseif ($tab === 'settings'): settings_view(); ?>
 <?php elseif ($tab === 'blocks'):
     $rows = db()->query("SELECT * FROM blocks WHERE bdate >= '$todayS' ORDER BY bdate, btime")->fetchAll(); ?>
   <?php $gs = gcal_status(); ?>
   <section class="card gcal">
     <h2>Kalendarz Google</h2>
     <?php if ($gs['state'] === 'off'): ?>
-      <p class="hint">Nie podłączono. Wklej tajny adres iCal swojego kalendarza do pliku <code>api/config.php</code> (pole <code>google_ical_url</code>). Wtedy każde wydarzenie w kalendarzu zajmie termin na stronie.</p>
+      <p class="hint">Nie podłączono. Wklej tajny adres iCal swojego kalendarza w zakładce <a href="?t=settings">Ustawienia</a>. Wtedy każde wydarzenie w kalendarzu zajmie termin na stronie.</p>
     <?php elseif ($gs['state'] === 'ok'): ?>
       <p class="hint">✅ Połączono. Ostatnie pobranie: <?= h(date('d.m H:i', $gs['at'])) ?>. Zmiany w kalendarzu widać na stronie po maks. 5 minutach. Wydarzenie „cały dzień” blokuje cały dzień, a zwykłe wydarzenie – godziny, na które nachodzi.</p>
     <?php elseif ($gs['state'] === 'error'): ?>
-      <p class="err">Nie udało się pobrać kalendarza (<?= h(date('d.m H:i', $gs['at'])) ?>). Sprawdź tajny adres iCal w <code>api/config.php</code>. Do czasu naprawy strona używa ostatniej pobranej wersji.</p>
+      <p class="err">Nie udało się pobrać kalendarza (<?= h(date('d.m H:i', $gs['at'])) ?>). Sprawdź tajny adres iCal w zakładce <a href="?t=settings">Ustawienia</a>. Do czasu naprawy strona używa ostatniej pobranej wersji.</p>
     <?php else: ?>
       <p class="hint">Adres podłączony. Status pojawi się po pierwszym otwarciu kalendarza na stronie.</p>
     <?php endif; ?>
@@ -825,5 +865,16 @@ i.h{background:#b98cf0}
 .redit[open]{order:10;flex-basis:100%;width:100%}.redit summary{list-style:none;display:inline-flex}.redit summary::-webkit-details-marker{display:none}.redit[open] summary{margin-bottom:10px}
 .linkhint{display:block;margin-top:2px;font-size:.8rem;line-height:1.45;color:var(--muted);text-transform:none;letter-spacing:0}.linkhint b{color:var(--hi);font-weight:600}
 @media (max-width:520px){.grid{grid-template-columns:1fr}}
+.chgbox.pend{border-color:var(--warn);background:linear-gradient(135deg,rgba(233,180,76,.16),rgba(233,180,76,.04))}.chgbox.pend h2 span{background:var(--warn)}
+.sx summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-size:1.05rem;color:var(--hi)}.sx summary::-webkit-details-marker{display:none}
+.sx summary em.off{font-style:normal;font-size:.72rem;color:var(--ink);background:var(--muted);border-radius:99px;padding:1px 9px}
+.sx[open] summary{margin-bottom:12px}.sx[open] .hed{font-size:0;padding:5px 12px}.sx[open] .hed::after{content:"Zwiń ▴";font-size:.8rem}
+.sform{display:grid;gap:14px}.fld{display:grid;gap:6px}.fl{font-size:.85rem;color:var(--gold)}.fh{color:var(--muted);font-size:.8rem;margin-top:-3px}
+.sw{display:flex!important;align-items:center;gap:10px;color:var(--cream);font-size:.95rem;background:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px}.sw input{width:22px;height:22px;accent-color:var(--gold)}
+.lrows{display:grid;gap:10px}.lrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--ink)}
+.lrow label{font-size:.75rem}.lrow .rb{grid-column:1/-1;justify-content:flex-end}.lrow input,.lrow select,.lrow textarea{padding:9px 10px}
+.imgf{display:flex;gap:14px;align-items:center;padding:10px;border:1px dashed var(--line);border-radius:12px;margin-bottom:10px}.imgf img{width:120px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--gold);flex:none}.imgf img.sq{width:84px;border-radius:50%}
+.imgf div{display:grid;gap:6px;justify-items:start}.imgf b{color:var(--hi);font-weight:500}.imgf small{color:var(--muted);font-size:.8rem}
+textarea{line-height:1.45}
 </style></head><body>
 <?php }
