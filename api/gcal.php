@@ -171,6 +171,28 @@ function gcal_expand(DateTime $start, ?string $rrule, DateTime $to, DateTimeZone
 }
 
 /** Zajęte godziny i całe dni z kalendarza Google w zakresie dat (Y-m-d, włącznie). */
+/** Wydarzenia jako przedziały minut w każdym dniu: ['busy' => [data => [[od, do], ...]], 'blocked_days' => [...]] */
+function gcal_intervals(string $fromDate, string $toDate): array
+{
+    $result = ['busy' => [], 'blocked_days' => []];
+    $ics = gcal_fetch(); if ($ics === null) return $result;
+    $tz = new DateTimeZone((string)(cfg('timezone') ?? 'Europe/Warsaw'));
+    $from = new DateTime($fromDate . ' 00:00', $tz);
+    $to   = (new DateTime($toDate . ' 00:00', $tz))->modify('+1 day');
+    $occ  = gcal_occurrences($ics, $from, $to);
+    for ($day = clone $from; $day < $to; $day->modify('+1 day')) {
+        $ds = $day->format('Y-m-d'); $dayEnd = (clone $day)->modify('+1 day');
+        foreach ($occ as [$s, $e, $all]) {
+            if (!($s < $dayEnd && $e > $day)) continue;
+            if ($all) { $result['blocked_days'][] = $ds; continue 2; }
+            $a = $s < $day ? 0 : ((int)$s->format('G')) * 60 + (int)$s->format('i');
+            $b = $e >= $dayEnd ? 1440 : ((int)$e->format('G')) * 60 + (int)$e->format('i');
+            if ($b > $a) $result['busy'][$ds][] = [$a, $b];
+        }
+    }
+    return $result;
+}
+
 function gcal_busy(string $fromDate, string $toDate): array
 {
     $result = ['taken' => [], 'blocked_days' => []];

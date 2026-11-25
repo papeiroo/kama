@@ -1,0 +1,593 @@
+{
+ "breeds": [
+  {
+   "n": "Akita",
+   "s": "big",
+   "p": 200,
+   "m": 210,
+   "a": "akita inu"
+  },
+  {
+   "n": "Amstaf",
+   "s": "medium",
+   "p": 140,
+   "m": 150,
+   "a": "amstaf american staffordshire"
+  },
+  {
+   "n": "Beagle",
+   "s": "medium",
+   "p": 130,
+   "m": 120,
+   "a": "beagle bigiel"
+  },
+  {
+   "n": "Bernardyn",
+   "s": "big",
+   "p": 250,
+   "m": 210,
+   "a": "bernardyn"
+  },
+  {
+   "n": "Berneński pies pasterski",
+   "s": "big",
+   "p": 250,
+   "m": 180,
+   "a": "bernenski berner"
+  },
+  {
+   "n": "Bichon frise",
+   "s": "small",
+   "p": 200,
+   "m": 165,
+   "a": "bichon bishon"
+  },
+  {
+   "n": "Biewer york",
+   "s": "small",
+   "p": 130,
+   "m": 135,
+   "a": "biewer"
+  },
+  {
+   "n": "Bokser",
+   "s": "big",
+   "p": 140,
+   "m": 120,
+   "a": "bokser boxer"
+  },
+  {
+   "n": "Bolończyk",
+   "s": "small",
+   "p": 160,
+   "m": 150,
+   "a": "bolonczyk"
+  },
+  {
+   "n": "Border collie",
+   "s": "medium",
+   "p": 200,
+   "m": 180,
+   "a": "border collie"
+  },
+  {
+   "n": "Boston terrier",
+   "s": "small",
+   "p": 130,
+   "m": 120,
+   "a": "boston"
+  },
+  {
+   "n": "Buldog angielski",
+   "s": "medium",
+   "p": 140,
+   "m": 120,
+   "a": "buldog angielski"
+  },
+  {
+   "n": "Buldog francuski",
+   "s": "small",
+   "p": 130,
+   "m": 120,
+   "a": "buldog francuski frenchie"
+  },
+  {
+   "n": "Bulterier",
+   "s": "medium",
+   "p": 140,
+   "m": 90,
+   "a": "bulterier bull terrier"
+  },
+  {
+   "n": "Cane corso",
+   "s": "big",
+   "p": 190,
+   "m": 210,
+   "a": "cane corso"
+  },
+  {
+   "n": "Cavalier King Charles spaniel",
+   "s": "small",
+   "p": 160,
+   "m": 150,
+   "a": "cavalier spaniel king charles"
+  },
+  {
+   "n": "Cavapoo",
+   "s": "medium",
+   "p": 200,
+   "m": 180,
+   "a": "cavapoo"
+  },
+  {
+   "n": "Chart afgański",
+   "s": "big",
+   "p": 300,
+   "m": 210,
+   "a": "chart afganski"
+  },
+  {
+   "n": "Chart krótkowłosy",
+   "s": "medium",
+   "p": 150,
+   "m": 90,
+   "a": "chart krotkowlosy whippet greyhound"
+  },
+  {
+   "n": "Chihuahua długowłosa",
+   "s": "small",
+   "p": 130,
+   "m": 105,
+   "a": "chihuahua dlugowlosa"
+  },
+  {
+   "n": "Chihuahua krótkowłosa",
+   "s": "small",
+   "p": 120,
+   "m": 80,
+   "a": "chihuahua cziłała krotkowlosa"
+  },
+  {
+   "n": "Chow chow",
+   "s": "big",
+   "p": 300,
+   "m": 210,
+   "a": "chow chow czau"
+  },
+  {
+   "n": "Cocker spaniel",
+   "s": "medium",
+   "p": 170,
+   "m": 180,
+   "a": "cocker spaniel koker"
+  },
+  {
+   "n": "Doberman",
+   "s": "big",
+   "p": 140,
+   "m": 120,
+   "a": "doberman"
+  },
+  {
+   "n": "Dog kanaryjski",
+   "s": "big",
+   "p": 250,
+   "m": 210,
+   "a": "dog kanaryjski presa"
+  },
+  {
+   "n": "Golden retriever",
+   "s": "big",
+   "p": 200,
+   "m": 180,
+   "a": "golden retriever"
+  },
+  {
+   "n": "Goldendoodle",
+   "s": "big",
+   "p": 220,
+   "m": 180,
+   "a": "goldendoodle"
+  },
+  {
+   "n": "Gryfonik",
+   "s": "small",
+   "p": 170,
+   "m": 150,
+   "a": "gryfonik brukselski"
+  },
+  {
+   "n": "Grzywacz chiński",
+   "s": "small",
+   "p": 150,
+   "m": 120,
+   "a": "grzywacz chinski"
+  },
+  {
+   "n": "Hawańczyk",
+   "s": "small",
+   "p": 160,
+   "m": 150,
+   "a": "hawanczyk havanese"
+  },
+  {
+   "n": "Husky",
+   "s": "big",
+   "p": 200,
+   "m": 210,
+   "a": "husky syberyjski"
+  },
+  {
+   "n": "Jack Russell terrier",
+   "s": "small",
+   "p": 160,
+   "m": 120,
+   "a": "jack russell jacek"
+  },
+  {
+   "n": "Jamnik długowłosy",
+   "s": "small",
+   "p": 150,
+   "m": 120,
+   "a": "jamnik dlugowlosy"
+  },
+  {
+   "n": "Jamnik krótkowłosy",
+   "s": "small",
+   "p": 120,
+   "m": 90,
+   "a": "jamnik krotkowlosy"
+  },
+  {
+   "n": "Labradoodle",
+   "s": "big",
+   "p": 220,
+   "m": 180,
+   "a": "labradoodle"
+  },
+  {
+   "n": "Labrador retriever",
+   "s": "big",
+   "p": 200,
+   "m": 180,
+   "a": "labrador"
+  },
+  {
+   "n": "Lhasa apso",
+   "s": "small",
+   "p": 160,
+   "m": 150,
+   "a": "lhasa apso"
+  },
+  {
+   "n": "Maltańczyk",
+   "s": "small",
+   "p": 150,
+   "m": 150,
+   "a": "maltanczyk maltese"
+  },
+  {
+   "n": "Maltipoo",
+   "s": "small",
+   "p": 170,
+   "m": 150,
+   "a": "maltipoo"
+  },
+  {
+   "n": "Mastif tybetański",
+   "s": "big",
+   "p": 400,
+   "m": 270,
+   "a": "mastif tybetanski"
+  },
+  {
+   "n": "Mieszaniec / kundelek – duży",
+   "s": "big",
+   "p": 220,
+   "m": 210,
+   "a": "kundelek kundel mieszaniec mieszanka duzy",
+   "g": "Mieszaniec / kundelek"
+  },
+  {
+   "n": "Mieszaniec / kundelek – mały",
+   "s": "small",
+   "p": 130,
+   "m": 105,
+   "a": "kundelek kundel mieszaniec mieszanka maly do 7 kg",
+   "v": [
+    {
+     "n": "krótkowłosy",
+     "p": 130,
+     "m": 105
+    },
+    {
+     "n": "średnia sierść",
+     "p": 150,
+     "m": 130
+    },
+    {
+     "n": "długowłosy / puchaty",
+     "p": 180,
+     "m": 150
+    }
+   ],
+   "g": "Mieszaniec / kundelek"
+  },
+  {
+   "n": "Mieszaniec / kundelek – średni",
+   "s": "medium",
+   "p": 170,
+   "m": 180,
+   "a": "kundelek kundel mieszaniec mieszanka sredni 8-18 kg",
+   "g": "Mieszaniec / kundelek"
+  },
+  {
+   "n": "Mops",
+   "s": "small",
+   "p": 130,
+   "m": 120,
+   "a": "mops pug"
+  },
+  {
+   "n": "Nowofundland",
+   "s": "big",
+   "p": 370,
+   "m": 240,
+   "a": "nowofundland newfoundland"
+  },
+  {
+   "n": "Owczarek australijski",
+   "s": "big",
+   "p": 200,
+   "m": 210,
+   "a": "owczarek australijski aussie"
+  },
+  {
+   "n": "Owczarek belgijski",
+   "s": "big",
+   "p": 220,
+   "m": 180,
+   "a": "owczarek belgijski malinois"
+  },
+  {
+   "n": "Owczarek kaukaski",
+   "s": "big",
+   "p": 300,
+   "m": 210,
+   "a": "owczarek kaukaski"
+  },
+  {
+   "n": "Owczarek niemiecki",
+   "s": "big",
+   "p": 250,
+   "m": 210,
+   "a": "owczarek niemiecki"
+  },
+  {
+   "n": "Owczarek podhalański",
+   "s": "big",
+   "p": 370,
+   "m": 240,
+   "a": "owczarek podhalanski"
+  },
+  {
+   "n": "Owczarek szetlandzki",
+   "s": "medium",
+   "p": 200,
+   "m": 180,
+   "a": "owczarek szetlandzki sheltie"
+  },
+  {
+   "n": "Owczarek szkocki (collie)",
+   "s": "big",
+   "p": 220,
+   "m": 180,
+   "a": "owczarek szkocki collie"
+  },
+  {
+   "n": "Owczarek szwajcarski",
+   "s": "big",
+   "p": 220,
+   "m": 180,
+   "a": "owczarek szwajcarski bialy"
+  },
+  {
+   "n": "Papillon",
+   "s": "small",
+   "p": 130,
+   "m": 120,
+   "a": "papillon motylek"
+  },
+  {
+   "n": "Pekińczyk",
+   "s": "small",
+   "p": 150,
+   "m": 150,
+   "a": "pekinczyk"
+  },
+  {
+   "n": "Polski owczarek nizinny",
+   "s": "medium",
+   "p": 220,
+   "m": 180,
+   "a": "owczarek nizinny pon"
+  },
+  {
+   "n": "Pudel toy",
+   "s": "small",
+   "p": 170,
+   "m": 150,
+   "a": "pudel toy poodle"
+  },
+  {
+   "n": "Pudel średni",
+   "s": "medium",
+   "p": 200,
+   "m": 180,
+   "a": "pudel sredni poodle"
+  },
+  {
+   "n": "Rottweiler",
+   "s": "big",
+   "p": 140,
+   "m": 150,
+   "a": "rottweiler"
+  },
+  {
+   "n": "Samojed",
+   "s": "medium",
+   "p": 300,
+   "m": 210,
+   "a": "samoyed samojed"
+  },
+  {
+   "n": "Shiba inu",
+   "s": "medium",
+   "p": 160,
+   "m": 135,
+   "a": "shiba"
+  },
+  {
+   "n": "Shih tzu",
+   "s": "small",
+   "p": 150,
+   "m": 150,
+   "a": "shihtzu shih-tzu szi tzu"
+  },
+  {
+   "n": "Staffordshire bull terrier (staffik)",
+   "s": "medium",
+   "p": 140,
+   "m": 120,
+   "a": "staffik staffordshire"
+  },
+  {
+   "n": "Sznaucer miniaturowy",
+   "s": "small",
+   "p": 160,
+   "m": 150,
+   "a": "sznaucer mini schnauzer"
+  },
+  {
+   "n": "Sznaucer średni",
+   "s": "medium",
+   "p": 180,
+   "m": 150,
+   "a": "sznaucer sredni schnauzer"
+  },
+  {
+   "n": "Szpic miniaturowy",
+   "s": "small",
+   "p": 160,
+   "m": 150,
+   "a": "szpic pomeranian pomerania miniaturowy"
+  },
+  {
+   "n": "Szpic średni",
+   "s": "medium",
+   "p": 200,
+   "m": 150,
+   "a": "szpic sredni"
+  },
+  {
+   "n": "Toy rosyjski",
+   "s": "small",
+   "p": 140,
+   "m": 120,
+   "a": "toy rosyjski terrier"
+  },
+  {
+   "n": "West highland white terrier",
+   "s": "small",
+   "p": 160,
+   "m": 150,
+   "a": "west westie"
+  },
+  {
+   "n": "Yorkshire terrier",
+   "s": "small",
+   "p": 140,
+   "m": 135,
+   "a": "york yorkshire terier"
+  }
+ ],
+ "sizes": {
+  "small": {
+   "label": "Mała rasa (do ok. 10 kg)",
+   "p": 140,
+   "m": 150
+  },
+  "medium": {
+   "label": "Średnia rasa (ok. 10–25 kg)",
+   "p": 170,
+   "m": 180
+  },
+  "big": {
+   "label": "Duża rasa (powyżej 25 kg)",
+   "p": 220,
+   "m": 210
+  }
+ },
+ "services": [
+  {
+   "k": "full",
+   "n": "Pełna pielęgnacja",
+   "d": "kąpiel i suszenie, rozczesanie, strzyżenie, uszy i pazurki",
+   "type": "breed"
+  },
+  {
+   "k": "bath",
+   "n": "Kąpiel",
+   "d": "z suszeniem i rozczesaniem",
+   "type": "size",
+   "p": {
+    "small": 50,
+    "medium": 70,
+    "big": 150
+   },
+   "m": {
+    "small": 60,
+    "medium": 90,
+    "big": 120
+   }
+  },
+  {
+   "k": "spa",
+   "n": "SPA ozonowe z hydromasażem",
+   "d": "osobna wizyta",
+   "type": "fixed",
+   "p": 90,
+   "m": 90,
+   "no": [
+    "big"
+   ]
+  },
+  {
+   "k": "puppy",
+   "n": "Wizyta adaptacyjna szczeniaka",
+   "d": "pierwsze oswajanie z salonem",
+   "type": "fixed",
+   "p": 70,
+   "m": 90
+  },
+  {
+   "k": "nails",
+   "n": "Obcinanie pazurków",
+   "d": "",
+   "type": "fixed",
+   "p": 20,
+   "m": 15
+  }
+ ],
+ "addon": {
+  "n": "SPA ozonowe z hydromasażem do pielęgnacji",
+  "p": 60,
+  "m": 30,
+  "for": [
+   "full"
+  ],
+  "no": [
+   "big"
+  ]
+ }
+}

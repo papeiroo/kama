@@ -1,4 +1,4 @@
-const CACHE='kama-v3';
+const CACHE='kama-v35';
 const ASSETS=["./", "index.html", "manifest.webmanifest", "ikony/icon-192.png", "ikony/icon-512.png", "ikony/apple-touch-icon.png", "img/logo-emblem.png", "img/about.jpg", "img/salon.jpg"];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(n=>n!==CACHE).map(n=>caches.delete(n)))).then(()=>self.clients.claim()))});

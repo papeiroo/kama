@@ -6,6 +6,11 @@ function site_schema(): array
     $sec = fn(string $id, string $title, ?string $toggle, array $f, string $hint = '') => compact('id', 'title', 'toggle', 'f', 'hint');
     return [
         $sec('dane', 'Dane salonu i kontakt', null, [
+            ['c', 'company', 'Pełna nazwa firmy (jak w CEIDG)', 'Wymagane w polityce prywatności i regulaminie, np. „KamaGrooming Kamila Kowalska”.'],
+            ['c', 'owner', 'Imię i nazwisko właściciela'],
+            ['c', 'nip', 'NIP'], ['c', 'regon', 'REGON (opcjonalnie)'],
+            ['c', 'hq', 'Adres firmy z CEIDG', 'Wypełnij tylko, jeśli jest inny niż adres salonu.'],
+            ['c', 'email', 'E-mail kontaktowy', 'Pokazywany w polityce prywatności; z tego adresu wychodzą też maile do klientów (musi to być skrzynka w domenie strony).'],
             ['c', 'phone', 'Telefon', 'Używany w przyciskach „Zadzwoń”, SMS i WhatsApp oraz w mailach do klientów.'],
             ['c', 'street', 'Ulica i numer'], ['c', 'city', 'Kod pocztowy i miasto'],
             ['c', 'fb', 'Link do Facebooka', 'Puste = ikonki Facebooka znikną ze strony.'],
@@ -41,9 +46,8 @@ function site_schema(): array
         ], 'Zdjęcia psów dodajesz w zakładce „Galeria”.'),
         $sec('cennik', 'Cennik – napisy', 'cennik', [
             ['t', 'price_eye', 'Mały nagłówek'], ['t', 'price_h2', 'Tytuł'], ['t', 'price_title', 'Nagłówek tabeli'], ['t', 'price_sub', 'Dopisek pod nagłówkiem'],
-            ['t', 'price_c0', 'Kolumna 1'], ['t', 'price_c1', 'Kolumna 2 (np. Małe rasy)'], ['t', 'price_c2', 'Kolumna 3 (np. Duże rasy)'],
-            ['t', 'price_extra', 'Nagłówek usług dodatkowych'], ['t', 'price_cta', 'Przycisk pod cennikiem'],
-        ], 'Same ceny zmieniasz w zakładce „Cennik”.'),
+            ['ta', 'price_note', 'Dopisek pod cennikiem'], ['t', 'price_cta', 'Przycisk pod cennikiem'],
+        ], 'Same ceny i czasy wizyt zmieniasz w zakładce „Rasy i ceny”.'),
         $sec('wizyta', 'Jak wygląda wizyta', 'wizyta', [
             ['t', 'steps_eye', 'Mały nagłówek'], ['t', 'steps_h2', 'Tytuł'],
             ['rows', 'steps', 'Kroki (numerują się same)', '', [['t', 'Nazwa kroku'], ['d', 'Opis', 'ta']]],
@@ -124,6 +128,7 @@ function site_handle(string $a): ?string
             $v = $clean($v, $type === 'seo' ? 320 : 3000);
             if ($type === 'c') {
                 if ($key === 'phone' && $v !== '' && strlen(preg_replace('/\D/', '', $v)) < 9) return 'Numer telefonu wygląda na niepełny – nic nie zapisano.';
+                if ($key === 'email' && $v !== '' && !filter_var($v, FILTER_VALIDATE_EMAIL)) return 'Adres e-mail wygląda na niepoprawny – nic nie zapisano.';
                 if ($key === 'fb' && $v !== '' && !preg_match('#^https?://\S+$#i', $v)) return 'Link do Facebooka musi zaczynać się od https:// – nic nie zapisano.';
                 $S['contact'][$key] = $v;
             } elseif ($type === 'seo') $S['seo'][$key] = $v;
@@ -269,6 +274,9 @@ function settings_handle(string $a): ?string
         $o['min_notice_minutes'] = max(0, min(72, (int)($_POST['min_notice_h'] ?? 2))) * 60;
         $o['manage_hours'] = max(0, min(168, (int)($_POST['manage_hours'] ?? 24)));
         $o['slot_minutes'] = max(15, min(480, (int)($_POST['slot_minutes'] ?? 120)));
+        $bf = (string)($_POST['big_from'] ?? '15:00'); $o['big_from'] = preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $bf) ? $bf : '15:00';
+        $o['big_max'] = max(0, min(10, (int)($_POST['big_max'] ?? 1)));
+        $o['remind_mail'] = empty($_POST['remind_mail']) ? 0 : 1;
         setting('c_cfg', json_encode($o, JSON_UNESCAPED_UNICODE));
         return 'Ustawienia zapisane.';
     }
@@ -285,7 +293,10 @@ function settings_view(): void
       <label>Ile dni do przodu można rezerwować<input type="number" name="days_ahead" min="7" max="365" value="<?= (int)cfg('days_ahead') ?>"></label>
       <label>Najwcześniej ile godzin przed wizytą<input type="number" name="min_notice_h" min="0" max="72" value="<?= (int)round((int)cfg('min_notice_minutes') / 60) ?>"></label>
       <label>Klient może sam zmienić / odwołać wizytę do (godzin przed)<input type="number" name="manage_hours" min="0" max="168" value="<?= (int)cfg('manage_hours') ?>"></label>
-      <label>Ile trwa jedna wizyta (minuty)<input type="number" name="slot_minutes" min="15" max="480" step="15" value="<?= (int)cfg('slot_minutes') ?>"></label>
+      <?php $br = big_rules(); ?>
+      <label>Duże psy – rezerwacja od godziny<small class="linkhint">Duży pies może zacząć od tej godziny nawet, jeśli skończy po zamknięciu – zobaczysz wtedy ostrzeżenie przy wizycie.</small><input type="time" name="big_from" step="1800" value="<?= h($br['from']) ?>"></label>
+      <label>Duże psy – ile maksymalnie dziennie<small class="linkhint">0 = bez limitu</small><input type="number" name="big_max" min="0" max="10" value="<?= (int)$br['max'] ?>"></label>
+      <label class="full sw"><input type="checkbox" name="remind_mail" value="1" <?= (string)cfg('remind_mail') === '0' ? '' : 'checked' ?>><span>Wysyłaj klientom automatyczne przypomnienie e-mail dzień przed wizytą</span></label>
       <label class="full">Kalendarz Google / iPhone (opcjonalnie)<small class="linkhint">Wklej <b>tajny adres w formacie iCal</b> z Kalendarza Google (Ustawienia kalendarza → Integracja) albo link webcal:// z iPhone'a. Każde wydarzenie w tym kalendarzu zajmie termin na stronie. Puste = wyłączone.</small><input name="google_ical_url" value="<?= h(cfg('google_ical_url')) ?>" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"></label>
       <button class="btn full">Zapisz ustawienia</button>
     </form>

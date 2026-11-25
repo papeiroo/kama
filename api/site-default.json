@@ -3,7 +3,13 @@
   "phone": "799 013 911",
   "fb": "https://www.facebook.com/share/1Ejamk7F3v/",
   "street": "ul. Dworcowa 16B",
-  "city": "89-100 Nakło nad Notecią"
+  "city": "89-100 Nakło nad Notecią",
+  "company": "Kama Grooming Psi Fryzjer Kamila Koth",
+  "owner": "Kamila Koth",
+  "nip": "5581567997",
+  "regon": "544914121",
+  "hq": "",
+  "email": "kontakt@kamagrooming.pl"
  },
  "seo": {
   "title": "KamaGrooming – Salon Pielęgnacji Psów",
@@ -39,18 +45,15 @@
   "gal_lead": "Psiaki prosto ze stołu groomerskiego. Zobacz, jak wyglądały przed wizytą.",
   "price_eye": "Cennik",
   "price_h2": "Cennik *usług*",
-  "price_title": "Pielęgnacja psów",
-  "price_sub": "Cena zależy od wielkości psa",
-  "price_c0": "Usługa",
-  "price_c1": "Małe rasy",
-  "price_c2": "Duże rasy",
-  "price_extra": "Usługi dodatkowe",
+  "price_title": "Cennik dla Twojego psa",
+  "price_sub": "Cena zależy od rasy i wielkości psa",
+  "price_note": "Cena może się różnić w zależności od stanu sierści, zachowania psa i czasu pracy.\nPrzy kołtunach, filcu lub bardzo wymagającej sierści cena ustalana jest na miejscu.",
   "price_cta": "Wybierz termin",
   "steps_eye": "Jak wygląda wizyta",
   "steps_h2": "Od rezerwacji *do odbioru*",
   "book_eye": "Rezerwacja online",
   "book_h2": "Wybierz *termin wizyty*",
-  "book_lead": "Kliknij dostępny dzień, wybierz godzinę i zostaw kontakt. Zajęte terminy są przekreślone.",
+  "book_lead": "Wybierz rasę psa i usługę, potem dzień i godzinę. Kalendarz pokazuje tylko te godziny, w których zmieści się wizyta Twojego pupila.",
   "hours_h": "Godziny pracy",
   "before_h": "Przed wizytą",
   "rev_eye": "Opinie",
@@ -107,9 +110,16 @@
    "Nakło nad Notecią"
   ],
   "chips": [
+   "Pielęgnacja kompleksowa",
    "Strzyżenie & stylizacja",
    "Kąpiele ozonowe",
+   "SPA z hydromasażem",
    "Wyczesywanie podszerstka",
+   "Rozczesywanie kołtunów",
+   "Obcinanie pazurków",
+   "Czyszczenie uszu",
+   "Mieszańce i kundelki",
+   "Małe, średnie i duże rasy",
    "Szczenięta mile widziane"
   ],
   "services": [
@@ -181,7 +191,7 @@
   "hours": [
    {
     "d": "Poniedziałek – Piątek",
-    "h": "9:00 – 17:00"
+    "h": "9:00 – 18:00"
    },
    {
     "d": "Sobota",

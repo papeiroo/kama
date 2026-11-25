@@ -2,6 +2,9 @@
 declare(strict_types=1);
 require __DIR__ . '/../api/lib.php';
 require __DIR__ . '/site-editor.php';
+require __DIR__ . '/breeds-editor.php';
+require __DIR__ . '/clients.php';
+require __DIR__ . '/voice.php';
 if (!is_configured()) { header('Location: ../api/install.php'); exit; }
 
 /* PANEL REZERWACJI KAMAGROOMING – logowanie hasłem ustawionym w api/install.php */
@@ -21,6 +24,36 @@ function chg_badge(array $r): string
     $p = explode(' ', (string)$r['chg_from']);
     return '<span class="src mv">🔁 przełożona przez klienta' . (count($p) === 2 ? ' · było: ' . h(pl_date($p[0]) . ', ' . $p[1]) : '') . '</span>';
 }
+function pet_pic(array $r): string { return !empty($r['photo']) ? '<a class="ppic" href="?photo=' . (int)$r['id'] . '" target="_blank" rel="noopener" title="Zdjęcie psa – powiększ"><img src="?photo=' . (int)$r['id'] . '" alt="Zdjęcie psa" loading="lazy"></a>' : ''; }
+function resched_form(array $r, string $back): string
+{
+    if (($r['status'] ?? '') === 'cancelled') return '';
+    $tel9 = substr(preg_replace('/\D/', '', (string)($r['phone'] ?? '')), -9);
+    $c = h(csrf()); $id = (int)$r['id'];
+    return '<details class="confirm resch"><summary class="btn sm ghost">🗓 Zmień termin</summary>'
+        . '<form method="post" class="rform"><input type="hidden" name="csrf" value="' . $c . '"><input type="hidden" name="a" value="resched"><input type="hidden" name="id" value="' . $id . '"><input type="hidden" name="back" value="' . h($back) . '">'
+        . '<p class="hint" style="margin:0">Zaproponuj klientowi inny dzień lub godzinę. Wizyta zostanie przeniesiona i oznaczona jako potwierdzona, a ' . ($tel9 ? 'telefon otworzy gotowego SMS-a do klienta' : 'klient nie ma numeru telefonu') . (!empty($r['email']) ? ' (dostanie też e-mail)' : '') . '.</p>'
+        . '<div class="rgrid"><label>Nowy dzień<input type="date" name="date" value="' . h($r['bdate']) . '" min="' . h(date('Y-m-d')) . '" required></label>'
+        . '<label>Godzina<input type="time" name="time" value="' . h($r['btime']) . '" step="900" required></label></div>'
+        . '<div class="acts">'
+        . ($tel9 ? '<a class="btn sm rsms" href="sms:+48' . h($tel9) . '">🗓 Zmień termin (SMS)</a>' : '<button class="btn sm">Zapisz nowy termin</button>')
+        . '<button type="button" class="link" onclick="this.closest(\'details\').open=false">Anuluj</button></div></form></details>';
+}
+function sms_href(string $phone, string $body): string { $t = substr(preg_replace('/\D/', '', $phone), -9); return $t ? 'sms:+48' . $t . '?&body=' . rawurlencode($body) : ''; }
+function cancel_sms_body(array $r): string { return 'Dzień dobry, niestety musimy odwołać wizytę ' . pl_date($r['bdate']) . ' o godz. ' . $r['btime'] . '. Przepraszamy – prosimy o kontakt, znajdziemy inny termin. KamaGrooming'; }
+function cancel_buttons(array $r): string { $l = cancel_sms_link($r); return $l !== '' ? $l : '<button class="btn sm danger">Tak, odwołaj wizytę</button>'; }
+function cancel_sms_link(array $r): string { $hr = sms_href((string)($r['phone'] ?? ''), cancel_sms_body($r)); return $hr ? '<a class="btn sm danger csms" href="' . h($hr) . '">✕ Odwołaj (SMS)</a>' : ''; }
+/* po odwołaniu / zmianie terminu zwykłym przyciskiem: przycisk „Wyślij SMS do klienta” na górze panelu */
+function sms_after(?array $v = null): ?array { if ($v !== null) { $_SESSION['sms_after'] = $v; return null; } $x = $_SESSION['sms_after'] ?? null; unset($_SESSION['sms_after']); return $x; }
+/* ostrzeżenie, gdy wizyta kończy się po zamknięciu salonu (np. duży pies od 15:00 na 4,5 h) */
+function late_note(array $r): string
+{
+    if (($r['status'] ?? '') === 'cancelled') return '';
+    $w = work_for((string)$r['bdate']); $dur = (int)($r['dur'] ?? 0) ?: 120; $end = hm2m((string)$r['btime']) + $dur;
+    if (!$w || $end <= $w[1]) return '';
+    return '<p class="late">⚠️ Uwaga – realizacja ' . h(dur_txt($dur)) . ', skończysz ok. ' . h(m2hm($end)) . ' (zamknięcie ' . h(m2hm($w[1])) . ').</p>';
+}
+function size_tag(array $r): string { $s = $r['size'] ?? ''; return $s === 'big' ? ' <span class="sz big">DUŻY PIES</span>' : ($s === 'small' ? ' <span class="sz">mały pies</span>' : ($s === 'medium' ? ' <span class="sz">średni pies</span>' : '')); }
 function flash(?string $m = null): ?string { if ($m !== null) { $_SESSION['flash'] = $m; return null; } $f = $_SESSION['flash'] ?? null; unset($_SESSION['flash']); return $f; }
 
 $error = '';
@@ -57,6 +90,14 @@ if (empty($_SESSION['auth'])) {
 
 try { ensure_manage_cols(); } catch (Throwable $e) { error_log('cols: ' . $e->getMessage()); }
 
+/* zdjęcie psa z rezerwacji – tylko po zalogowaniu */
+if (isset($_GET['photo'])) {
+    $st = db()->prepare('SELECT photo FROM bookings WHERE id = ?'); $st->execute([(int)$_GET['photo']]); $ph = (string)$st->fetchColumn();
+    $f = dirname(__DIR__) . '/' . $ph;
+    if (!preg_match('#^uploads/pets/[0-9a-f-]+\.jpg$#', $ph) || !is_file($f)) { http_response_code(404); exit; }
+    header('Content-Type: image/jpeg'); header('Cache-Control: private, max-age=86400'); readfile($f); exit;
+}
+
 /* ---------- akcje (POST + CSRF) ---------- */
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if (!hash_equals(csrf(), (string)($_POST['csrf'] ?? ''))) { flash('Sesja wygasła, spróbuj ponownie.'); go(); }
@@ -66,6 +107,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $back = preg_match('/^\?[a-z=&0-9-]*$/', $back) ? $back : '';
     try {
         switch ($a) {
+            case 'remind':
+                db()->prepare('UPDATE bookings SET rem_sms = 1 WHERE id = ?')->execute([$id]); break;
+            case 'resched':
+                $date = (string)($_POST['date'] ?? ''); $time = (string)($_POST['time'] ?? '');
+                if (!valid_date($date) || !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) { flash('Podaj poprawny dzień i godzinę.'); break; }
+                $st = db()->prepare('SELECT * FROM bookings WHERE id = ?'); $st->execute([$id]); $bk = $st->fetch();
+                if (!$bk || $bk['status'] === 'cancelled') break;
+                if ($bk['bdate'] === $date && $bk['btime'] === $time) { flash('To ten sam termin – nic nie zmieniono.'); break; }
+                try {
+                    db()->prepare("UPDATE bookings SET bdate = ?, btime = ?, slot_key = ?, status = 'confirmed', chg_seen = 1 WHERE id = ?")->execute([$date, $time, "$date $time", $id]);
+                } catch (PDOException $e) { flash($e->getCode() === '23000' ? 'Ta godzina jest już zajęta przez inną wizytę – wybierz inną.' : 'Nie udało się zmienić terminu.'); break; }
+                $old = pl_date($bk['bdate']) . ', godz. ' . $bk['btime']; $new = pl_date($date) . ', godz. ' . $time; $mailed = false;
+                if (!empty($bk['email'])) {
+                    $brand = site_get()['t']['brand'] ?? 'KamaGrooming';
+                    $mailed = send_mail((string)$bk['email'], 'Nowy termin wizyty: ' . $new,
+                        "Dzień dobry,\n\nzmieniliśmy termin wizyty Twojego psa.\n\nByło: $old\nNowy termin: $new\nAdres: " . cfg('address') . "\n\nJeśli nowy termin nie pasuje, zadzwoń lub napisz SMS: " . cfg('phone') . " – znajdziemy inny.\n\nDo zobaczenia!\n$brand\n" . cfg('site_url') . "\n",
+                        (string)cfg('notify_email'));
+                }
+                if (!empty($bk['phone']) && empty($_POST['nosms'])) sms_after(['phone' => (string)$bk['phone'], 'name' => (string)$bk['name'], 'body' => 'Dzień dobry, proponujemy nowy termin wizyty: ' . pl_date($date) . ' o godz. ' . $time . '. Jeśli nie pasuje, prosimy o informację. KamaGrooming']);
+                flash('Termin zmieniony na ' . $new . '.' . ($mailed ? ' Klient dostał e-mail.' : '')); break;
             case 'confirm': case 'cancel':
                 $st = db()->prepare('SELECT * FROM bookings WHERE id = ?'); $st->execute([$id]); $bk = $st->fetch();
                 if (!$bk) break;
@@ -79,34 +140,57 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                         : "Dzień dobry,\n\nniestety musimy odwołać wizytę: $when.\nZadzwoń lub napisz SMS, a znajdziemy inny termin: " . cfg('phone') . ".\nMożesz też wybrać nowy termin na stronie: " . cfg('site_url') . "/#rezerwacja\n\nPrzepraszamy i pozdrawiamy,\n$brand\n";
                     $mailed = send_mail((string)$bk['email'], ($a === 'confirm' ? 'Wizyta potwierdzona: ' : 'Wizyta odwołana: ') . $when, $body, (string)cfg('notify_email'));
                 }
+                if ($a === 'cancel' && $bk['status'] !== 'cancelled' && !empty($bk['phone']) && empty($_POST['nosms'])) sms_after(['phone' => (string)$bk['phone'], 'name' => (string)$bk['name'], 'body' => cancel_sms_body($bk)]);
                 flash(($a === 'confirm' ? 'Wizyta zaakceptowana.' : 'Wizyta odwołana. Termin jest znów wolny.') . ($mailed ? ' Klient dostał e-mail.' : '')); break;
+            case 'restore':
+                /* przywrócenie omyłkowo odwołanej wizyty – tylko gdy termin wciąż wolny */
+                $st = db()->prepare('SELECT * FROM bookings WHERE id = ?'); $st->execute([$id]); $bk = $st->fetch();
+                if (!$bk || $bk['status'] !== 'cancelled') break;
+                $s0 = hm2m((string)$bk['btime']); $e0 = $s0 + ((int)($bk['dur'] ?? 0) ?: 120);
+                $bm = busy_map((string)$bk['bdate'], (string)$bk['bdate'], (int)$bk['id']);
+                $clash = false; foreach ($bm['busy'][$bk['bdate']] ?? [] as [$a1, $b1]) if ($s0 < $b1 && $e0 > $a1) { $clash = true; break; }
+                if ($clash) { flash('Nie można przywrócić – w tym czasie jest już inna wizyta lub blokada. Użyj „Zmień termin” albo dodaj wizytę ręcznie.'); break; }
+                try {
+                    db()->prepare("UPDATE bookings SET status = 'confirmed', slot_key = ?, chg = NULL, chg_seen = 1 WHERE id = ?")->execute([$bk['bdate'] . ' ' . $bk['btime'], $id]);
+                } catch (PDOException $e) { flash('Nie można przywrócić – ta godzina jest już zajęta.'); break; }
+                flash('Wizyta przywrócona (' . pl_date($bk['bdate']) . ', ' . $bk['btime'] . '). Daj znać klientce, że wizyta jest aktualna.');
+                break;
             case 'seen':
                 db()->prepare('UPDATE bookings SET chg_seen = 1 WHERE id = ?')->execute([$id]);
                 break;
             case 'delete':
+                $st = db()->prepare('SELECT photo FROM bookings WHERE id = ?'); $st->execute([$id]); if ($ph = $st->fetchColumn()) delete_upload((string)$ph);
                 db()->prepare('DELETE FROM bookings WHERE id = ?')->execute([$id]);
                 flash('Rezerwacja usunięta.'); break;
             case 'add':
                 $date = (string)($_POST['date'] ?? ''); $time = (string)($_POST['time'] ?? '');
                 $name = trim((string)($_POST['name'] ?? '')); $phone = preg_replace('/[\s\-()]/', '', (string)($_POST['phone'] ?? ''));
                 if (!valid_date($date) || !preg_match('/^\d{2}:\d{2}$/', $time) || $name === '') { flash('Uzupełnij datę, godzinę i imię.'); break; }
+                $breed = trim((string)($_POST['breed'] ?? ''));
+                $q = quote($breed, (string)($_POST['size'] ?? ''), (string)($_POST['svc'] ?? 'full'), !empty($_POST['addon']), (int)($_POST['coat'] ?? -1));
+                if (isset($q['error'])) { flash(str_contains($q['error'], 'sierści') || str_contains($q['error'], 'dostępne') ? $q['error'] : 'Wpisz rasę z listy albo zaznacz wielkość psa.'); break; }
+                $dur = parse_min((string)($_POST['dur'] ?? '')) ?: (int)$q['min'];
+                $petTxt = trim(($q['breed'] ?: $breed) . (trim((string)($_POST['pet'] ?? '')) !== '' ? ' · ' . trim((string)$_POST['pet']) : ''), ' ·');
+                ensure_manage_cols();
                 try {
-                    db()->prepare("INSERT INTO bookings (bdate, btime, name, phone, email, service, pet, status, slot_key, source, ip, created_at)
-                                   VALUES (?, ?, ?, ?, NULL, ?, ?, 'confirmed', ?, 'panel', NULL, ?)")
-                        ->execute([$date, $time, mb_substr($name, 0, 120), mb_substr($phone, 0, 20), mb_substr(trim((string)($_POST['service'] ?? '')), 0, 160) ?: null, mb_substr(trim((string)($_POST['pet'] ?? '')), 0, 160) ?: null, "$date $time", date('Y-m-d H:i:s')]);
-                    flash('Wizyta dodana.');
+                    db()->prepare("INSERT INTO bookings (bdate, btime, name, phone, email, service, pet, size, dur, price, status, slot_key, source, ip, created_at)
+                                   VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, 'confirmed', ?, 'panel', NULL, ?)")
+                        ->execute([$date, $time, mb_substr($name, 0, 120), mb_substr($phone, 0, 20), mb_substr($q['service'] . ' · ok. ' . dur_txt($dur) . ' · ' . $q['price'] . ' zł', 0, 160), mb_substr($petTxt, 0, 160) ?: null, $q['size'], $dur, $q['price'], "$date $time", date('Y-m-d H:i:s')]);
+                    $wk = work_for($date); $end = hm2m($time) + $dur;
+                    flash('Wizyta dodana: ' . $time . '–' . m2hm($end) . '.' . ($wk && $end > $wk[1] ? ' Uwaga – kończy się po zamknięciu salonu (' . m2hm($wk[1]) . ').' : ''));
                 } catch (PDOException $e) { flash($e->getCode() === '23000' ? 'Ta godzina jest już zajęta.' : 'Nie udało się dodać wizyty.'); }
                 break;
             case 'block':
                 $date = (string)($_POST['date'] ?? ''); $time = (string)($_POST['time'] ?? '');
-                $to = (string)($_POST['date_to'] ?? '');
+                $to = (string)($_POST['date_to'] ?? ''); $tt = (string)($_POST['time_to'] ?? '');
+                ensure_manage_cols();
                 if (!valid_date($date)) { flash('Wybierz datę.'); break; }
                 if ($time !== '' && !preg_match('/^\d{2}:\d{2}$/', $time)) $time = '';
                 $end = valid_date($to) && $to >= $date ? $to : $date;
                 $d = new DateTime($date); $n = 0;
                 while ($d->format('Y-m-d') <= $end && $n < 62) {
-                    db()->prepare('INSERT INTO blocks (bdate, btime, note, created_at) VALUES (?, ?, ?, ?)')
-                        ->execute([$d->format('Y-m-d'), $time ?: null, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 160) ?: null, date('Y-m-d H:i:s')]);
+                    db()->prepare('INSERT INTO blocks (bdate, btime, bend, note, created_at) VALUES (?, ?, ?, ?, ?)')
+                        ->execute([$d->format('Y-m-d'), $time ?: null, ($time && preg_match('/^\d{2}:\d{2}$/', $tt) && $tt > $time) ? $tt : ($time ? m2hm(hm2m($time) + 60) : null), mb_substr(trim((string)($_POST['note'] ?? '')), 0, 160) ?: null, date('Y-m-d H:i:s')]);
                     $d->modify('+1 day'); $n++;
                 }
                 flash($n > 1 ? "Zablokowano $n dni." : 'Termin zablokowany.'); break;
@@ -161,17 +245,36 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     $list[$i]['title'] = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 120); flash('Podpis zapisany.');
                 }
                 content_set($key, $list); break;
-            case 'day_hours':
+            case 'day_work':
                 $date = (string)($_POST['date'] ?? ''); if (!valid_date($date)) break;
-                $m = day_hours_map(); $mode = (string)($_POST['mode'] ?? 'save');
+                $m = day_work_map(); $mode = (string)($_POST['mode'] ?? 'save');
+                $o = (string)($_POST['o'] ?? ''); $c = (string)($_POST['c'] ?? '');
                 if ($mode === 'reset') { unset($m[$date]); flash('Przywrócono standardowe godziny w tym dniu.'); }
                 elseif ($mode === 'close') { $m[$date] = []; flash('Ten dzień jest teraz nieczynny dla rezerwacji.'); }
-                else { $m[$date] = clean_times($_POST['times'] ?? []); flash($m[$date] ? 'Godziny w tym dniu zapisane: ' . implode(', ', $m[$date]) . '.' : 'Brak godzin – dzień nieczynny.'); }
-                ksort($m); setting('c_dayhours', json_encode($m)); break;
-            case 'week_hours':
-                $w = [];
-                for ($d = 0; $d <= 6; $d++) { $t = clean_times($_POST["h$d"] ?? []); if ($t) $w[$d] = $t; }
-                setting('c_hours', json_encode($w)); flash('Standardowe godziny pracy zapisane.'); break;
+                elseif (preg_match('/^\d{2}:\d{2}$/', $o) && preg_match('/^\d{2}:\d{2}$/', $c) && $c > $o) { $m[$date] = [$o, $c]; flash("Godziny w tym dniu: $o–$c."); }
+                else { flash('Godzina zamknięcia musi być późniejsza niż otwarcia.'); break; }
+                ksort($m); setting('c_daywork', json_encode($m)); break;
+            case 'week_work':
+                $w = []; $err = false;
+                for ($d = 0; $d <= 6; $d++) {
+                    if (empty($_POST["on$d"])) continue;
+                    $o = (string)($_POST["o$d"] ?? ''); $c = (string)($_POST["c$d"] ?? '');
+                    if (!preg_match('/^\d{2}:\d{2}$/', $o) || !preg_match('/^\d{2}:\d{2}$/', $c) || $c <= $o) { $err = true; continue; }
+                    $w[$d] = [$o, $c];
+                }
+                if ($err) { flash('Popraw godziny – zamknięcie musi być później niż otwarcie. Nic nie zapisano.'); break; }
+                setting('c_work', json_encode($w));
+                $gw = [];
+                for ($d = 0; $d <= 6; $d++) {
+                    preg_match_all('/(\d{1,2})[:.](\d{2})|\b(\d{1,2})\b/', (string)($_POST["g$d"] ?? ''), $mm, PREG_SET_ORDER);
+                    $ts = [];
+                    foreach ($mm as $x) { $hh = (int)($x[1] !== '' ? $x[1] : $x[3]); $mi = (int)($x[2] ?? 0); if ($hh < 24 && $mi < 60) $ts[] = sprintf('%02d:%02d', $hh, $mi); }
+                    $ts = array_values(array_unique($ts)); sort($ts); if ($ts) $gw[$d] = $ts;
+                }
+                setting('c_grid', json_encode($gw));
+                $oc = json_decode((string)(setting('c_cfg') ?? ''), true); if (!is_array($oc)) $oc = [];
+                $oc['overrun'] = max(0, min(120, (int)($_POST['overrun'] ?? 30))); setting('c_cfg', json_encode($oc, JSON_UNESCAPED_UNICODE));
+                flash('Godziny otwarcia zapisane. Kalendarz na stronie już z nich korzysta.'); break;
             case 'rev_add':
                 $text = trim((string)($_POST['text'] ?? '')); $nm = trim((string)($_POST['rname'] ?? ''));
                 if (mb_strlen($text) < 5 || $nm === '') { flash('Wpisz imię i treść opinii.'); break; }
@@ -202,6 +305,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 if ($a === 'rev_del') { if (!empty($list[$i]['img'])) delete_upload($list[$i]['img']); array_splice($list, $i, 1); flash('Opinia usunięta.'); }
                 else { $j = $i + ((($_POST['dir'] ?? '') === 'up') ? -1 : 1); if (isset($list[$j])) [$list[$i], $list[$j]] = [$list[$j], $list[$i]]; }
                 content_set('reviews', $list); break;
+            case 'bk_edit':
+                flash(bk_edit($id)); break;
+            case 'client_save': case 'client_del':
+                flash(clients_handle($a)); break;
+            case 'save_breeds': case 'breeds_reset':
+                flash((string)breeds_handle($a)); break;
             case 'site_save': case 'site_reset': case 'site_img': case 'set_pass': case 'set_cfg':
                 $m = strpos($a, 'site_') === 0 ? site_handle($a) : settings_handle($a);
                 if ($m !== null) flash($m); break;
@@ -228,10 +337,11 @@ $f = flash();
   <a href="?t=cal" class="<?= $tab === 'cal' ? 'on' : '' ?>">Kalendarz</a>
   <a href="?t=next" class="<?= $tab === 'next' ? 'on' : '' ?>">Nadchodzące<?= $pending ? ' <b>' . $pending . '</b>' : '' ?></a>
   <a href="?t=add" class="<?= $tab === 'add' ? 'on' : '' ?>">Dodaj wizytę</a>
+  <a href="?t=clients" class="<?= $tab === 'clients' ? 'on' : '' ?>">👥 Klienci</a>
   <a href="?t=blocks" class="<?= $tab === 'blocks' ? 'on' : '' ?>">Wolne dni</a>
   <a href="?t=hours" class="<?= $tab === 'hours' ? 'on' : '' ?>">Godziny pracy</a>
   <a href="?t=past" class="<?= $tab === 'past' ? 'on' : '' ?>">Historia</a>
-  <a href="?t=prices" class="<?= $tab === 'prices' ? 'on' : '' ?>">Cennik</a>
+  <a href="?t=prices" class="<?= $tab === 'prices' ? 'on' : '' ?>">🐶 Rasy i ceny</a>
   <a href="?t=gallery" class="<?= $tab === 'gallery' ? 'on' : '' ?>">Galeria</a>
   <a href="?t=certs" class="<?= $tab === 'certs' ? 'on' : '' ?>">Certyfikaty</a>
   <a href="?t=reviews" class="<?= $tab === 'reviews' ? 'on' : '' ?>">Opinie</a>
@@ -240,6 +350,12 @@ $f = flash();
 </nav>
 <main class="wrap">
 <?php if ($f): ?><p class="flash"><?= h($f) ?></p><?php endif; ?>
+<?php $sa = sms_after(); if ($sa && ($hr = sms_href($sa['phone'], $sa['body']))): ?>
+  <div class="note smsbox"><span>📱 Daj znać klientowi (<?= h($sa['name']) ?>) SMS-em – treść jest już gotowa, możesz ją poprawić przed wysłaniem.</span><a class="btn sm" href="<?= h($hr) ?>">Wyślij SMS do klienta</a></div>
+<?php endif; ?>
+<?php $ct = site_get()['contact'] ?? []; if ($tab !== 'site' && (trim((string)($ct['company'] ?? '')) === '' || trim((string)($ct['nip'] ?? '')) === '')): ?>
+  <p class="note">⚖️ Uzupełnij <b>nazwę firmy i NIP</b> w <a href="?t=site&amp;s=dane">Treści strony → Dane salonu i kontakt</a> – pojawią się w polityce prywatności i regulaminie rezerwacji, których wymaga prawo.</p>
+<?php endif; ?>
 <?php
     /* ---------- zmiany zrobione przez klientów na stronie (do przyjęcia) ---------- */
     $chgs = [];
@@ -262,7 +378,7 @@ $f = flash();
       </div>
       <div class="acts">
         <?php if ($c['chg'] === 'move' && $c['status'] !== 'cancelled'): ?>
-          <form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab ?? 'cal') ?>"><?php if ($tel9): ?><a class="btn sm csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">Potwierdź z SMS</a><?php else: ?><button class="btn sm">Potwierdź</button><?php endif; ?></form>
+          <form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab ?? 'cal') ?>"><?php if ($tel9): ?><a class="btn sm csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">✓ Potwierdź (SMS)</a><?php else: ?><button class="btn sm">Potwierdź</button><?php endif; ?></form>
           <a class="btn sm ghost" href="?t=cal&amp;m=<?= h(substr((string)$c['bdate'], 0, 7)) ?>&amp;d=<?= h($c['bdate']) ?>#dzien">Pokaż w kalendarzu</a>
         <?php else: ?>
           <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="seen"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab ?? 'cal') ?>"><button class="btn sm">OK, przyjęłam</button></form>
@@ -271,6 +387,33 @@ $f = flash();
     </div>
     <?php endforeach; ?>
   </section>
+<?php endif; ?>
+
+<?php
+    /* ---------- PRZYPOMNIENIA SMS: najbliższy dzień z wizytami (jutro albo do 3 dni naprzód) ---------- */
+    send_due_reminders();
+    $remDay = null; $rem = [];
+    try {
+        $st = db()->prepare("SELECT MIN(bdate) FROM bookings WHERE status <> 'cancelled' AND bdate > ? AND bdate <= ?");
+        $st->execute([$todayS, (new DateTime('+3 days'))->format('Y-m-d')]); $remDay = $st->fetchColumn() ?: null;
+        if ($remDay) { $st = db()->prepare("SELECT * FROM bookings WHERE status <> 'cancelled' AND bdate = ? AND phone IS NOT NULL AND phone <> '' ORDER BY btime"); $st->execute([$remDay]); $rem = $st->fetchAll(); }
+    } catch (Throwable $e) {}
+    $remLeft = array_filter($rem, fn($r) => empty($r['rem_sms']));
+    if ($rem): ?>
+  <details class="chgbox rem" <?= $remLeft ? 'open' : '' ?>>
+    <summary><h2>🔔 Przypomnienia – <?= h(pl_date($remDay)) ?> <span><?= count($remLeft) ?: '✓' ?></span></h2></summary>
+    <p class="hint" style="margin:0 0 8px"><?= $remLeft ? 'Jednym kliknięciem otworzysz gotowego SMS-a z przypomnieniem. Klienci z e-mailem dostają też przypomnienie mailem automatycznie.' : 'Wszystkim klientom na ten dzień wysłano już przypomnienie.' ?></p>
+    <?php foreach ($rem as $r): $tel9 = substr(preg_replace('/\D/', '', (string)$r['phone']), -9); ?>
+    <div class="chg">
+      <div class="chg-t"><b><?= h($r['btime']) ?></b> · <?= h($r['name']) ?><?= !empty($r['pet']) ? ' · 🐶 ' . h($r['pet']) : '' ?><?= $r['status'] === 'pending' ? ' <span class="sz">niepotwierdzona</span>' : '' ?></div>
+      <div class="acts">
+        <?php if (empty($r['rem_sms'])): ?>
+        <form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="remind"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><a class="btn sm csms" href="<?= h(sms_href((string)$r['phone'], reminder_text($r))) ?>">📩 Przypomnij (SMS)</a></form>
+        <?php else: ?><span class="sz ok">✓ przypomniano</span><a class="link" href="<?= h(sms_href((string)$r['phone'], reminder_text($r))) ?>">wyślij ponownie</a><?php endif; ?>
+      </div>
+    </div>
+    <?php endforeach; ?>
+  </details>
 <?php endif; ?>
 
 <?php
@@ -283,12 +426,13 @@ $f = flash();
     <?php foreach ($pend as $r): $tel9 = substr(preg_replace('/\D/', '', (string)$r['phone']), -9);
         $sms = 'Dzień dobry, potwierdzam wizytę ' . pl_date($r['bdate']) . ' o godz. ' . $r['btime'] . '. Do zobaczenia! KamaGrooming'; ?>
     <div class="chg">
-      <div class="chg-t"><b><?= h(pl_date($r['bdate'])) ?>, <?= h($r['btime']) ?></b> · <?= h($r['name']) ?><?= !empty($r['pet']) ? ' · 🐶 ' . h($r['pet']) : '' ?><?= !empty($r['service']) ? '<span class="chg-w">' . h($r['service']) . '</span>' : '' ?>
-        <span class="chg-w"><?php if ($tel9): ?><a href="tel:+48<?= h($tel9) ?>">📞 <?= h(phone_pretty((string)$r['phone'])) ?></a><?php endif; ?><?= !empty($r['email']) ? ' · ' . h($r['email']) : '' ?></span></div>
+      <?= pet_pic($r) ?>
+      <div class="chg-t"><b><?= h(pl_date($r['bdate'])) ?>, <?= h($r['btime'] . '–' . m2hm(hm2m((string)$r['btime']) + ((int)($r['dur'] ?? 0) ?: 120))) ?></b> · <?= h($r['name']) ?> <?= client_badge($r) ?><?= !empty($r['pet']) ? ' · 🐶 ' . h($r['pet']) : '' ?><?= size_tag($r) ?><?= !empty($r['service']) ? '<span class="chg-w">' . h($r['service']) . '</span>' : '' ?>
+        <span class="chg-w"><?php if ($tel9): ?><a href="tel:+48<?= h($tel9) ?>">📞 <?= h(phone_pretty((string)$r['phone'])) ?></a><?php endif; ?><?= !empty($r['email']) ? ' · ' . h($r['email']) : '' ?></span><?= late_note($r) ?></div>
       <div class="acts">
-        <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><button class="btn sm">✓ Akceptuj</button></form>
-        <?php if ($tel9): ?><form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><a class="btn sm ghost csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">Akceptuj + SMS</a></form><?php endif; ?>
-        <details class="confirm"><summary class="btn sm danger">✕ Odwołaj</summary><form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="cancel"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><button class="btn sm danger">Tak, odwołaj wizytę</button></form></details>
+        <form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><?php if ($tel9): ?><a class="btn sm csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">✓ Akceptuj (SMS)</a><?php else: ?><button class="btn sm">✓ Akceptuj</button><?php endif; ?></form>
+        <?= resched_form($r, '?t=' . $tab) ?>
+        <details class="confirm"><summary class="btn sm danger">✕ Odwołaj</summary><form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="cancel"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=<?= h($tab) ?>"><?= cancel_buttons($r) ?></form></details>
       </div>
     </div>
     <?php endforeach; ?>
@@ -308,13 +452,15 @@ $f = flash();
     $byDay = [];
     $st = db()->prepare("SELECT * FROM bookings WHERE status <> 'cancelled' AND bdate BETWEEN ? AND ? ORDER BY btime");
     $st->execute([$fromS, $toS]);
-    foreach ($st as $r) $byDay[$r['bdate']][$r['btime']] = $r;
+    foreach ($st as $r) $byDay[$r['bdate']][] = $r;
     $blkDay = []; $blkSlot = [];
-    $st = db()->prepare('SELECT * FROM blocks WHERE bdate BETWEEN ? AND ?');
+    $st = db()->prepare('SELECT * FROM blocks WHERE bdate BETWEEN ? AND ? ORDER BY btime');
     $st->execute([$fromS, $toS]);
-    foreach ($st as $b) { if ($b['btime']) $blkSlot[$b['bdate']][$b['btime']] = $b; else $blkDay[$b['bdate']] = $b; }
-    try { $g = gcal_busy($fromS, $toS); } catch (Throwable $e) { $g = ['taken' => [], 'blocked_days' => []]; }
+    foreach ($st as $b) { if ($b['btime']) $blkSlot[$b['bdate']][] = $b; else $blkDay[$b['bdate']] = $b; }
+    try { $g = gcal_intervals($fromS, $toS); } catch (Throwable $e) { $g = ['busy' => [], 'blocked_days' => []]; }
     $gDay = array_flip($g['blocked_days']);
+    try { $bm = busy_map($fromS, $toS); } catch (Throwable $e) { $bm = ['busy' => [], 'closed' => [], 'big' => []]; }
+    $dwm = day_work_map();
 
     $months = ['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
     $prev = (clone $first)->modify('-1 month')->format('Y-m'); $next = (clone $first)->modify('+1 month')->format('Y-m');
@@ -328,43 +474,38 @@ $f = flash();
     <div class="days">
 <?php
     $lead = ((int)$first->format('N')) - 1;
-    $nowHM = date('H:i'); $sum = ['f' => 0, 'p' => 0, 'c' => 0, 'd' => 0]; $daySum = [];
+    $nowM = (int)date('G') * 60 + (int)date('i'); $daySum = [];
     for ($i = 0; $i < $lead; $i++) echo '<span class="day empty"></span>';
     for ($d = clone $first; $d <= $last; $d->modify('+1 day')):
-        $ds = $d->format('Y-m-d'); $hours = hours_for($ds);
+        $ds = $d->format('Y-m-d'); $w = work_for($ds);
         $bk = $byDay[$ds] ?? [];
-        $closed = !$hours; $dayOff = isset($blkDay[$ds]) || isset($gDay[$ds]);
-        $busy = 0; foreach ($hours as $t) if (isset($bk[$t]) || isset($blkSlot[$ds][$t]) || in_array($t, $g['taken'][$ds] ?? [], true)) $busy++;
-        $free = ($closed || $dayOff) ? 0 : max(0, count($hours) - $busy);
+        $closed = !$w; $dayOff = isset($blkDay[$ds]) || isset($gDay[$ds]);
+        $free = ($closed || $dayOff || $ds < $todayS) ? 0 : count(day_starts($ds, 150, 'small', 0, $bm));
         $cls = 'day';
         if ($ds < $todayS) $cls .= ' past';
         if ($closed && !$bk) $cls .= ' off';
         elseif ($dayOff) $cls .= ' blocked';
-        elseif (!$free && $hours) $cls .= ' full';
+        elseif (!$free && !$closed && $ds >= $todayS) $cls .= ' full';
         if ($ds === $todayS) $cls .= ' today';
         if ($ds === $sel) $cls .= ' sel';
-        if (array_key_exists($ds, day_hours_map())) $cls .= ' custom';
-        $dots = ''; $sum = ['f' => 0, 'p' => 0, 'c' => 0, 'd' => 0];
-        foreach ($bk as $t => $r) {
-            $done = $ds < $todayS || ($ds === $todayS && $t < $nowHM);
+        if (array_key_exists($ds, $dwm)) $cls .= ' custom';
+        $dots = ''; $sum = ['f' => $free, 'p' => 0, 'c' => 0, 'd' => 0];
+        foreach ($bk as $r) {
+            $done = $ds < $todayS || ($ds === $todayS && hm2m((string)$r['btime']) < $nowM);
             $k = $done ? 'd' : ($r['status'] === 'confirmed' ? 'c' : 'p');
             $sum[$k]++; $dots .= '<i class="' . $k . '"></i>';
         }
-        if ($free && $ds >= $todayS) foreach ($hours as $t) {
-            if (isset($bk[$t]) || isset($blkSlot[$ds][$t]) || in_array($t, $g['taken'][$ds] ?? [], true)) continue;
-            if ($ds === $todayS && $t <= $nowHM) continue;
-            $sum['f']++; $dots .= '<i class="f"></i>';
-        }
+        if ($free) $dots .= str_repeat('<i class="f"></i>', min($free, 3));
         $daySum[$ds] = $sum;
 ?>
       <a class="<?= $cls ?>" href="?t=cal&amp;m=<?= h($m) ?>&amp;d=<?= h($ds) ?>#dzien"><b><?= (int)$d->format('j') ?></b><?php if ($dots): ?><span class="dots"><?= $dots ?></span><?php elseif ($dayOff): ?><span class="tag">wolne</span><?php endif; ?></a>
 <?php endfor; ?>
     </div>
-    <div class="legend"><span><i class="f"></i>Wolny termin</span><span><i class="p"></i>Do potwierdzenia</span><span><i class="c"></i>Potwierdzona</span><span><i class="d"></i>Zrealizowana</span><span><i class="h"></i>Zmienione godziny</span></div>
+    <div class="legend"><span><i class="f"></i>Wolne miejsce (wizyta 2,5 h)</span><span><i class="p"></i>Do potwierdzenia</span><span><i class="c"></i>Potwierdzona</span><span><i class="d"></i>Zrealizowana</span><span><i class="h"></i>Zmienione godziny</span></div>
 <?php $sum = $daySum[$sel] ?? null; if ($sum): ?>
     <p class="msum-h">Podsumowanie dnia: <b><?= h(pl_date($sel)) ?></b></p>
     <div class="msum">
-      <div><b><?= $sum['f'] ?></b><span>wolnych terminów</span></div>
+      <div><b><?= $sum['f'] ?></b><span>godzin startu (2,5 h)</span></div>
       <div class="p"><b><?= $sum['p'] ?></b><span>do potwierdzenia</span></div>
       <div class="c"><b><?= $sum['c'] ?></b><span>potwierdzonych</span></div>
       <div class="g"><b><?= $sum['p'] + $sum['c'] ?></b><span>do zrealizowania</span></div>
@@ -376,77 +517,87 @@ $f = flash();
   </section>
 
 <?php if ($sel):
-    $hours = hours_for($sel); $bk = $byDay[$sel] ?? [];
-    $extra = array_diff(array_keys($bk), $hours); $slots = array_values(array_unique(array_merge($hours, $extra))); sort($slots);
+    $w = work_for($sel); $bk = $byDay[$sel] ?? [];
     $back = '?t=cal&m=' . $m . '&d=' . $sel;
+    /* oś dnia: wizyty, blokady, wydarzenia z kalendarza i wolne okienka między nimi */
+    $items = [];
+    foreach ($bk as $r) { $s = hm2m((string)$r['btime']); $items[] = ['s' => $s, 'e' => $s + ((int)$r['dur'] ?: 120), 't' => 'bk', 'r' => $r]; }
+    foreach ($blkSlot[$sel] ?? [] as $b) { $s = hm2m((string)$b['btime']); $items[] = ['s' => $s, 'e' => !empty($b['bend']) ? hm2m((string)$b['bend']) : $s + 120, 't' => 'blk', 'r' => $b]; }
+    foreach ($g['busy'][$sel] ?? [] as $iv) $items[] = ['s' => $iv[0], 'e' => $iv[1], 't' => 'g'];
+    if ($w && !isset($blkDay[$sel]) && !isset($gDay[$sel])) {
+        $cur = $w[0]; $sorted = $items; usort($sorted, fn($a, $b) => $a['s'] <=> $b['s']);
+        foreach ($sorted as $it) { if ($it['s'] - $cur >= 15 && $cur < $w[1]) $items[] = ['s' => $cur, 'e' => min($it['s'], $w[1]), 't' => 'free']; $cur = max($cur, $it['e']); }
+        if ($w[1] - $cur >= 15) $items[] = ['s' => $cur, 'e' => $w[1], 't' => 'free'];
+    }
+    usort($items, fn($a, $b) => [$a['s'], $a['t'] === 'free'] <=> [$b['s'], $b['t'] === 'free']);
 ?>
   <h2 class="day" id="dzien"><?= h(pl_date($sel)) ?></h2>
   <?php if (isset($blkDay[$sel])): ?><p class="note">⛔ Dzień zablokowany w panelu<?= $blkDay[$sel]['note'] ? ' (' . h($blkDay[$sel]['note']) . ')' : '' ?>. Usuniesz blokadę w zakładce „Wolne dni”.</p><?php endif; ?>
   <?php if (isset($gDay[$sel])): ?><p class="note">📅 W kalendarzu iPhone/Google jest wydarzenie całodniowe – na stronie ten dzień jest niedostępny.</p><?php endif; ?>
-  <?php $dm = day_hours_map(); $custom = array_key_exists($sel, $dm); if ($sel >= $todayS): ?>
+  <?php $custom = array_key_exists($sel, $dwm); $std = work_week()[(int)(new DateTime($sel))->format('w')] ?? null; if ($sel >= $todayS): ?>
   <details class="card hedit" <?= $custom ? 'open' : '' ?>>
-    <summary><b>🕘 Godziny w tym dniu</b> <span class="hint" style="margin:0"><?= $custom ? ($dm[$sel] ? 'zmienione: ' . h(implode(', ', $dm[$sel])) : 'dzień zamknięty') : 'standardowe: ' . h(implode(', ', weekly_hours()[(int)(new DateTime($sel))->format('w')] ?? []) ?: 'nieczynne') ?></span><span class="hed">Edytuj</span></summary>
-    <p class="hint">Ustaw godziny rozpoczęcia wizyt tylko na ten dzień. Na stronie klienci zobaczą dokładnie te godziny. Inne dni się nie zmienią.</p>
-    <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="day_hours"><input type="hidden" name="date" value="<?= h($sel) ?>"><input type="hidden" name="back" value="<?= h($back) ?>">
-      <?= time_list('times', hours_for($sel)) ?>
+    <summary><b>🕘 Godziny w tym dniu</b> <span class="hint" style="margin:0"><?= $w ? h(m2hm($w[0]) . '–' . m2hm($w[1])) . ($custom ? ' (zmienione)' : '') : 'nieczynne' ?></span><span class="hed">Edytuj</span></summary>
+    <p class="hint">Godziny otwarcia tylko na ten dzień (standardowo: <?= $std ? h($std[0] . '–' . $std[1]) : 'nieczynne' ?>). Kalendarz na stronie dopasuje wolne godziny do długości wizyt.</p>
+    <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="day_work"><input type="hidden" name="date" value="<?= h($sel) ?>"><input type="hidden" name="back" value="<?= h($back) ?>">
+      <div class="grid"><label>Otwarcie<input type="time" name="o" step="900" value="<?= h($w ? m2hm($w[0]) : ($std[0] ?? '09:00')) ?>"></label><label>Zamknięcie<input type="time" name="c" step="900" value="<?= h($w ? m2hm($w[1]) : ($std[1] ?? '18:00')) ?>"></label></div>
       <div class="acts" style="margin-top:12px"><button class="btn sm" name="mode" value="save">Zapisz godziny</button>
       <?php if ($custom): ?><button class="btn sm ghost" name="mode" value="reset">Przywróć standardowe</button><?php endif; ?>
       <button class="btn sm danger" name="mode" value="close">Zamknij ten dzień</button></div>
     </form>
   </details>
-  <?= time_list_js() ?>
   <?php endif; ?>
-  <?php if (!$slots): ?><p class="empty">W ten dzień salon jest nieczynny.</p><?php endif; ?>
-  <?php foreach ($slots as $t):
-      $r = $bk[$t] ?? null;
-      $isBlk = isset($blkSlot[$sel][$t]); $isG = in_array($t, $g['taken'][$sel] ?? [], true);
-      if ($r):
+  <?php if (!$items): ?><p class="empty">W ten dzień salon jest nieczynny.</p><?php endif; ?>
+  <?php foreach ($items as $it): $tr = m2hm($it['s']) . '–' . m2hm($it['e']);
+      if ($it['t'] === 'bk'): $r = $it['r'];
         $tel9 = substr(preg_replace('/\D/', '', (string)$r['phone']), -9);
         $sms = 'Dzień dobry, potwierdzam wizytę ' . pl_date($r['bdate']) . ' o godz. ' . $r['btime'] . '. Do zobaczenia! KamaGrooming'; ?>
     <article class="bk <?= h($r['status']) ?>">
-      <div class="row1"><span class="time"><?= h($t) ?></span><span class="pill"><?= $r['status'] === 'confirmed' ? 'Potwierdzona' : 'Do potwierdzenia' ?></span><?= $r['source'] === 'panel' ? '<span class="src">dodana ręcznie</span>' : '' ?><?= chg_badge($r) ?></div>
-      <div class="name"><?= h($r['name']) ?></div>
-      <?php if (!empty($r['pet'])): ?><div class="pet">🐾 <?= h($r['pet']) ?></div><?php endif; ?>
-      <?php if ($r['service']): ?><div class="svc"><?= h($r['service']) ?></div><?php endif; ?>
-      <div class="contact"><?php if ($tel9): ?><a href="tel:+48<?= h($tel9) ?>">📞 <?= h(phone_pretty((string)$r['phone'])) ?></a><?php endif; ?><?php if ($r['email']): ?><a href="mailto:<?= h($r['email']) ?>">✉️ <?= h($r['email']) ?></a><?php endif; ?></div>
+      <div class="row1"><span class="time"><?= h($tr) ?></span><?= dur_pen($r) ?><span class="pill"><?= $r['status'] === 'confirmed' ? 'Potwierdzona' : 'Do potwierdzenia' ?></span><?= $r['source'] === 'panel' ? '<span class="src">dodana ręcznie</span>' : '' ?><?= chg_badge($r) ?><?= client_badge($r) ?></div>
+      <?= late_note($r) ?>
+      <?= bk_info($r) ?>
       <?php if ($sel >= $todayS): ?><div class="acts">
         <?php if ($r['status'] === 'pending'): ?>
-          <form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="<?= h($back) ?>"><?php if ($tel9): ?><a class="btn sm csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">Potwierdź z SMS</a><?php else: ?><button class="btn sm">Potwierdź</button><?php endif; ?></form>
+          <form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="<?= h($back) ?>"><?php if ($tel9): ?><a class="btn sm csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">✓ Potwierdź (SMS)</a><?php else: ?><button class="btn sm">Potwierdź</button><?php endif; ?></form>
         <?php endif; ?>
+        <?= resched_form($r, $back) ?>
         <details class="confirm"><summary class="btn sm danger">Odwołaj</summary>
-          <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="cancel"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="<?= h($back) ?>"><button class="btn sm danger">Tak, odwołaj wizytę</button></form>
+          <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="cancel"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="<?= h($back) ?>"><?= cancel_buttons($r) ?></form>
         </details>
       </div><?php endif; ?>
     </article>
-  <?php elseif ($isBlk || $isG || isset($blkDay[$sel]) || isset($gDay[$sel])): ?>
-    <div class="slotrow busy"><span class="time"><?= h($t) ?></span><span><?= $isBlk ? '⛔ zablokowane w panelu' : (isset($blkDay[$sel]) ? '⛔ dzień wolny' : '📅 zajęte w kalendarzu iPhone/Google') ?></span></div>
+  <?php elseif ($it['t'] === 'blk'): $b = $it['r']; ?>
+    <div class="slotrow busy"><span class="time"><?= h($tr) ?></span><span>⛔ zablokowane w panelu<?= $b['note'] ? ' · ' . h($b['note']) : '' ?></span>
+      <form method="post" style="margin-left:auto"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="unblock"><input type="hidden" name="id" value="<?= (int)$b['id'] ?>"><input type="hidden" name="back" value="<?= h($back) ?>"><button class="link">odblokuj</button></form></div>
+  <?php elseif ($it['t'] === 'g'): ?>
+    <div class="slotrow busy"><span class="time"><?= h($tr) ?></span><span>📅 zajęte w kalendarzu iPhone/Google</span></div>
   <?php elseif ($sel >= $todayS): ?>
-    <div class="slotrow free"><span class="time"><?= h($t) ?></span><span>wolne</span>
-      <span class="sacts"><a class="btn sm ghost" href="?t=add&amp;date=<?= h($sel) ?>&amp;time=<?= h($t) ?>">+ Dodaj wizytę</a>
-      <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="block"><input type="hidden" name="date" value="<?= h($sel) ?>"><input type="hidden" name="time" value="<?= h($t) ?>"><input type="hidden" name="back" value="<?= h($back) ?>"><button class="btn sm ghost">Zablokuj</button></form></span>
+    <div class="slotrow free"><span class="time"><?= h($tr) ?></span><span>wolne · <?= h(dur_txt($it['e'] - $it['s'])) ?></span>
+      <span class="sacts"><a class="btn sm ghost" href="?t=add&amp;date=<?= h($sel) ?>&amp;time=<?= h(m2hm($it['s'])) ?>">+ Dodaj wizytę</a>
+      <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="block"><input type="hidden" name="date" value="<?= h($sel) ?>"><input type="hidden" name="time" value="<?= h(m2hm($it['s'])) ?>"><input type="hidden" name="time_to" value="<?= h(m2hm($it['e'])) ?>"><input type="hidden" name="back" value="<?= h($back) ?>"><button class="btn sm ghost">Zablokuj</button></form></span>
     </div>
-  <?php else: ?>
-    <div class="slotrow busy"><span class="time"><?= h($t) ?></span><span>—</span></div>
   <?php endif; endforeach; ?>
-  <?php if ($sel >= $todayS && $slots && !isset($blkDay[$sel])): ?>
+  <?php if ($sel >= $todayS && $w && !isset($blkDay[$sel])): ?>
     <form method="post" class="dayblock"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="block"><input type="hidden" name="date" value="<?= h($sel) ?>"><input type="hidden" name="back" value="<?= h($back) ?>"><button class="link">Zablokuj cały ten dzień</button></form>
   <?php endif; ?>
 <?php else: ?>
   <p class="empty">Kliknij dzień w kalendarzu, żeby zobaczyć wizyty i wolne godziny.</p>
 <?php endif; ?>
 
-<?php elseif ($tab === 'hours'): $w = weekly_hours(); $dn = [1 => 'Poniedziałek', 2 => 'Wtorek', 3 => 'Środa', 4 => 'Czwartek', 5 => 'Piątek', 6 => 'Sobota', 0 => 'Niedziela']; ?>
+<?php elseif ($tab === 'hours'): $w = work_week(); $gw = grid_week(); $dn = [1 => 'Poniedziałek', 2 => 'Wtorek', 3 => 'Środa', 4 => 'Czwartek', 5 => 'Piątek', 6 => 'Sobota', 0 => 'Niedziela']; $br = big_rules(); ?>
   <section class="card">
-    <h2>Standardowe godziny pracy</h2>
-    <p class="hint">Godziny rozpoczęcia wizyt w zwykłym tygodniu. Dzień bez godzin = nieczynne. Godziny na pojedynczy dzień zmienisz w zakładce Kalendarz (kliknij dzień → „Godziny w tym dniu”).</p>
-    <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="week_hours"><input type="hidden" name="back" value="?t=hours">
-      <?php foreach ($dn as $d => $label): ?>
-        <div class="wrow"><b><?= $label ?></b><?= time_list("h$d", $w[$d] ?? []) ?></div>
+    <h2>Godziny otwarcia</h2>
+    <p class="hint">Od której do której przyjmujesz i o których godzinach zaczynają się wizyty (np. 9, 11, 13, 15). Gdy wizyta trwa dłużej – np. shih tzu 9:00–11:30 – kolejna godzina sama przesuwa się na 11:30. Kto pierwszy, ten lepszy: godziny, na które nie zmieści się już pies danej rasy, znikają (czas z zakładki „Rasy i ceny”). Godziny na pojedynczy dzień zmienisz w Kalendarzu (kliknij dzień → „Godziny w tym dniu”).</p>
+    <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="week_work"><input type="hidden" name="back" value="?t=hours">
+      <?php foreach ($dn as $d => $label): $v = $w[$d] ?? null; ?>
+        <div class="wrow2"><label class="sw"><input type="checkbox" name="on<?= $d ?>" value="1" <?= $v ? 'checked' : '' ?>><span><?= $label ?></span></label>
+          <input type="time" name="o<?= $d ?>" step="900" value="<?= h($v[0] ?? '09:00') ?>" aria-label="<?= $label ?> otwarcie"><span>–</span><input type="time" name="c<?= $d ?>" step="900" value="<?= h($v[1] ?? '18:00') ?>" aria-label="<?= $label ?> zamknięcie">
+          <label class="gridl">Podstawowe godziny wizyt<input name="g<?= $d ?>" value="<?= h(implode(', ', $gw[$d] ?? [])) ?>" placeholder="np. 9:00, 11:00, 13:00, 15:00"></label></div>
       <?php endforeach; ?>
-      <button class="btn" style="width:100%;margin-top:14px">Zapisz godziny pracy</button>
+      <label style="margin-top:14px">Poślizg dla ostatniej wizyty (małe i średnie psy), w minutach<small class="linkhint">Wizyta może skończyć się tyle minut po zamknięciu. Duży pies od <?= h($br['from']) ?> może skończyć dowolnie później – dostaniesz wtedy ostrzeżenie przy rezerwacji.</small><input type="number" name="overrun" min="0" max="120" step="5" value="<?= overrun_min() ?>"></label>
+      <button class="btn" style="width:100%;margin-top:14px">Zapisz godziny otwarcia</button>
     </form>
+    <p class="hint" style="margin-top:12px">Zasady dla dużych psów (od której godziny, ile dziennie) zmienisz w zakładce <a href="?t=settings">Ustawienia</a>.</p>
   </section>
-  <?= time_list_js() ?>
 
 <?php elseif ($tab === 'reviews'): $list = array_values(content_get()['reviews']); ?>
   <section class="card">
@@ -501,44 +652,8 @@ $f = flash();
     im.src=u;});
   </script>
 
-<?php elseif ($tab === 'prices'): $c = content_get(); ?>
-  <section class="card">
-    <h2>Cennik</h2>
-    <p class="hint">Zmień ceny i kliknij „Zapisz cennik”. Kolumny: cena dla małych i dla dużych ras. Puste pole = na stronie „—”. Możesz wpisać np. „od 120”. Kolejność zmieniasz strzałkami. Kolejne rzędy dodasz przyciskiem na dole.</p>
-    <form method="post" id="pf">
-      <input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="save_prices"><input type="hidden" name="back" value="?t=prices">
-      <div class="ptable" id="prow">
-        <div class="phead"><span>Usługa</span><span>Opis</span><span>Małe rasy</span><span>Duże rasy</span><span></span></div>
-        <?php foreach ($c['prices'] as $p): ?>
-        <div class="prow"><input name="p_name[]" value="<?= h($p['name']) ?>" placeholder="np. Kąpiel ozonowa"><input name="p_desc[]" value="<?= h($p['desc']) ?>" placeholder="krótki opis (opcjonalnie)"><input name="p_set[]" value="<?= h($p['set']) ?>" inputmode="numeric" placeholder="150"><input name="p_refill[]" value="<?= h($p['refill']) ?>" inputmode="numeric" placeholder="130"><span class="rb"><button type="button" class="mv" data-d="up" aria-label="W górę">↑</button><button type="button" class="mv" data-d="dn" aria-label="W dół">↓</button><button type="button" class="rm" aria-label="Usuń">✕</button></span></div>
-        <?php endforeach; ?>
-      </div>
-      <button type="button" class="btn sm ghost" id="addp">+ Dodaj usługę</button>
-      <h2 style="margin-top:22px">Dodatkowe usługi</h2>
-      <div class="ptable ex" id="erow">
-        <?php foreach ($c['extras'] as $e): ?>
-        <div class="prow"><input name="e_name[]" value="<?= h($e['name']) ?>" placeholder="np. Obcinanie pazurów"><input name="e_price[]" value="<?= h($e['price']) ?>" inputmode="numeric" placeholder="130"><span class="rb"><button type="button" class="mv" data-d="up" aria-label="W górę">↑</button><button type="button" class="mv" data-d="dn" aria-label="W dół">↓</button><button type="button" class="rm" aria-label="Usuń">✕</button></span></div>
-        <?php endforeach; ?>
-      </div>
-      <button type="button" class="btn sm ghost" id="adde">+ Dodaj usługę</button>
-      <label style="margin-top:18px">Dopisek pod cennikiem<textarea name="note" rows="2" maxlength="300"><?= h($c['note']) ?></textarea></label>
-      <button class="btn full" style="margin-top:16px;width:100%">Zapisz cennik</button>
-    </form>
-  </section>
-  <script>
-  (function(){
-    const rowP='<input name="p_name[]" placeholder="np. Kąpiel ozonowa"><input name="p_desc[]" placeholder="krótki opis (opcjonalnie)"><input name="p_set[]" inputmode="numeric" placeholder="150"><input name="p_refill[]" inputmode="numeric" placeholder="130">';
-    const rowE='<input name="e_name[]" placeholder="np. Czyszczenie uszu"><input name="e_price[]" inputmode="numeric" placeholder="50">';
-    const tools='<span class="rb"><button type="button" class="mv" data-d="up" aria-label="W górę">↑</button><button type="button" class="mv" data-d="dn" aria-label="W dół">↓</button><button type="button" class="rm" aria-label="Usuń">✕</button></span>';
-    function add(box,html){const d=document.createElement('div');d.className='prow';d.innerHTML=html+tools;box.appendChild(d);d.querySelector('input').focus()}
-    document.getElementById('addp').onclick=()=>add(document.getElementById('prow'),rowP);
-    document.getElementById('adde').onclick=()=>add(document.getElementById('erow'),rowE);
-    document.getElementById('pf').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const r=b.closest('.prow');if(!r)return;
-      if(b.classList.contains('rm'))r.remove();
-      else if(b.dataset.d==='up'&&r.previousElementSibling&&r.previousElementSibling.classList.contains('prow'))r.parentNode.insertBefore(r,r.previousElementSibling);
-      else if(b.dataset.d==='dn'&&r.nextElementSibling)r.parentNode.insertBefore(r.nextElementSibling,r);});
-  })();
-  </script>
+<?php elseif ($tab === 'prices'): breeds_view(); ?>
+<?php elseif ($tab === 'clients'): clients_view(); ?>
 
 <?php elseif ($tab === 'gallery'): $c = content_get(); $list = array_values(array_filter($c['gallery'], 'is_array')); ?>
   <section class="card">
@@ -660,24 +775,21 @@ $f = flash();
         $labels = ['pending' => 'Do potwierdzenia', 'confirmed' => 'Potwierdzona', 'cancelled' => 'Odwołana'];
 ?>
   <article class="bk <?= h($r['status']) ?>">
-    <div class="row1"><span class="time"><?= h($r['btime']) ?></span><span class="pill"><?= h($r['status'] === 'cancelled' && ($r['chg'] ?? '') === 'cancel' ? 'Odwołana przez klienta' : ($labels[$r['status']] ?? $r['status'])) ?></span><?= $r['source'] === 'panel' ? '<span class="src">dodana ręcznie</span>' : '' ?><?= chg_badge($r) ?></div>
-    <div class="name"><?= h($r['name']) ?></div>
-    <?php if (!empty($r['pet'])): ?><div class="pet">🐾 <?= h($r['pet']) ?></div><?php endif; ?>
-      <?php if ($r['service']): ?><div class="svc"><?= h($r['service']) ?></div><?php endif; ?>
-    <div class="contact">
-      <?php if ($tel): ?><a href="tel:+48<?= h($tel9) ?>">📞 <?= h($tel) ?></a><?php endif; ?>
-      <?php if ($r['email']): ?><a href="mailto:<?= h($r['email']) ?>">✉️ <?= h($r['email']) ?></a><?php endif; ?>
-    </div>
+    <div class="row1"><span class="time"><?= h($r['btime'] . '–' . m2hm(hm2m((string)$r['btime']) + ((int)($r['dur'] ?? 0) ?: 120))) ?></span><?= dur_pen($r) ?><span class="pill"><?= h($r['status'] === 'cancelled' && ($r['chg'] ?? '') === 'cancel' ? 'Odwołana przez klienta' : ($labels[$r['status']] ?? $r['status'])) ?></span><?= $r['source'] === 'panel' ? '<span class="src">dodana ręcznie</span>' : '' ?><?= chg_badge($r) ?><?= client_badge($r) ?></div>
+    <?= late_note($r) ?>
+    <?= bk_info($r) ?>
     <?php if (!$past): ?>
     <div class="acts">
       <?php if ($r['status'] === 'pending'): ?>
-        <form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=next"><?php if ($tel9): ?><a class="btn sm csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">Potwierdź z SMS</a><?php else: ?><button class="btn sm">Potwierdź</button><?php endif; ?></form>
+        <form method="post" class="cform"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="confirm"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=next"><?php if ($tel9): ?><a class="btn sm csms" href="sms:+48<?= h($tel9) ?>?&amp;body=<?= rawurlencode($sms) ?>">✓ Potwierdź (SMS)</a><?php else: ?><button class="btn sm">Potwierdź</button><?php endif; ?></form>
       <?php endif; ?>
       <?php if ($r['status'] !== 'cancelled'): ?>
+        <?= resched_form($r, '?t=next') ?>
         <details class="confirm"><summary class="btn sm danger">Odwołaj</summary>
-          <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="cancel"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=next"><button class="btn sm danger">Tak, odwołaj wizytę</button></form>
+          <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="cancel"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=next"><?= cancel_buttons($r) ?></form>
         </details>
       <?php else: ?>
+        <?php if (!$past): ?><form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="restore"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=next"><button class="btn sm">↺ Przywróć wizytę</button></form><?php endif; ?>
         <form method="post"><input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="delete"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="back" value="?t=next"><button class="btn sm ghost">Usuń z listy</button></form>
       <?php endif; ?>
     </div>
@@ -685,21 +797,48 @@ $f = flash();
   </article>
 <?php endforeach; ?>
 
-<?php elseif ($tab === 'add'): $hours = weekly_hours(); $all = []; foreach ($hours as $l) $all = array_merge($all, $l); $all = array_values(array_unique($all)); sort($all); ?>
+<?php elseif ($tab === 'add'): $bc = breeds_get(); ?>
   <section class="card">
     <h2>Dodaj wizytę umówioną telefonicznie</h2>
-    <p class="hint">Termin zniknie z kalendarza na stronie, żeby nikt go nie zajął.</p>
-    <form method="post" class="grid">
+    <p class="hint">Czas wizyty liczy się sam z rasy i usługi (możesz go zmienić). Ten czas zniknie z kalendarza na stronie, żeby nikt go nie zajął.</p>
+    <?= voice_box() ?>
+    <form method="post" class="grid" id="addf">
       <input type="hidden" name="csrf" value="<?= h(csrf()) ?>"><input type="hidden" name="a" value="add"><input type="hidden" name="back" value="<?= valid_date((string)($_GET['date'] ?? '')) ? h('?t=cal&m=' . substr($_GET['date'], 0, 7) . '&d=' . $_GET['date']) : '?t=next' ?>">
       <label>Data<input type="date" name="date" min="<?= h($todayS) ?>" value="<?= h(valid_date((string)($_GET['date'] ?? '')) ? $_GET['date'] : '') ?>" required></label>
-      <label>Godzina<input type="time" name="time" step="900" list="hrs" value="<?= h(preg_match('/^\d{2}:\d{2}$/', (string)($_GET['time'] ?? '')) ? $_GET['time'] : '') ?>" required><datalist id="hrs"><?php foreach ($all as $t) echo '<option value="' . h($t) . '">'; ?></datalist></label>
+      <label>Godzina rozpoczęcia<input type="time" name="time" step="300" value="<?= h(preg_match('/^\d{2}:\d{2}$/', (string)($_GET['time'] ?? '')) ? $_GET['time'] : '') ?>" required></label>
       <label>Imię i nazwisko<input name="name" maxlength="120" required></label>
-      <label>Telefon<input name="phone" type="tel" maxlength="20"></label>
-      <label>Pies (imię, rasa / waga)<input name="pet" maxlength="160" placeholder="np. Fafik, shih tzu, 6 kg"></label>
-      <label>Usługa<input name="service" maxlength="160" placeholder="np. Strzyżenie i stylizacja"></label>
+      <label>Telefon<input name="phone" type="tel" maxlength="20"><small id="cliHint" class="chint"></small></label>
+      <label>Rasa psa<input name="breed" list="brl" maxlength="80" placeholder="zacznij pisać…" required><datalist id="brl"><?php foreach ($bc['breeds'] as $b) echo '<option value="' . h($b['n']) . '">'; ?></datalist></label>
+      <label id="coatL" hidden>Długość sierści<select name="coat"></select></label>
+      <label>Wielkość <small>(gdy rasy nie ma na liście)</small><select name="size"><option value="small">Mały</option><option value="medium">Średni</option><option value="big">Duży</option></select></label>
+      <label>Usługa<select name="svc"><?php foreach ($bc['services'] as $sv) echo '<option value="' . h($sv['k']) . '">' . h($sv['n']) . '</option>'; ?></select></label>
+      <?php if (!empty($bc['addon'])): ?><label class="sw"><input type="checkbox" name="addon" value="1"><span>+ <?= h($bc['addon']['n']) ?></span></label><?php endif; ?>
+      <label>Pies <small>(imię, waga – opcjonalnie)</small><input name="pet" maxlength="100" placeholder="np. Fafik, 6 kg"></label>
+      <label>Czas wizyty <small id="durHint"></small><input name="dur" placeholder="np. 2:30"></label>
       <button class="btn full">Dodaj wizytę</button>
     </form>
   </section>
+  <script>
+  (function(){const B=window.__ADD_B=<?= json_encode($bc, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;const f=document.getElementById('addf');
+    const nr=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/[^a-z0-9]+/g,' ').trim();
+    const t=m=>Math.floor(m/60)+':'+String(m%60).padStart(2,'0');
+    function calc(){const b=B.breeds.find(x=>nr(x.n)===nr(f.breed.value));const size=b?b.s:f.size.value;if(b)f.size.value=b.s;
+      const sv=B.services.find(s=>s.k===f.svc.value)||B.services[0];const sz=B.sizes[size]||{p:0,m:120};let p,m;
+      const cl=document.getElementById('coatL'),hv=!!(b&&b.v&&b.v.length);cl.hidden=!hv;
+      if(hv&&f.coat.dataset.for!==b.n){f.coat.innerHTML=b.v.map((v,i)=>'<option value="'+i+'">'+v.n.replace(/</g,'&lt;')+' – '+v.p+' zł, '+t(+v.m)+'</option>').join('');f.coat.dataset.for=b.n}
+      if(!hv){f.coat.innerHTML='<option value="-1"></option>';f.coat.dataset.for=''}
+      if(sv.type==='breed'){p=b?b.p:sz.p;m=b?b.m:sz.m;if(hv){const v=b.v[+f.coat.value]||b.v[0];p=v.p;m=v.m}}else if(sv.type==='size'){p=sv.p[size];m=sv.m[size]}else{p=sv.p;m=sv.m}
+      if(f.addon&&f.addon.checked&&B.addon&&(B.addon.for||[]).includes(sv.k)){p+=+B.addon.p;m+=+B.addon.m}
+      f.dur.value=t(m);document.getElementById('durHint').textContent='(wg cennika: '+t(m)+' · '+p+' zł)'}
+    ['breed','size','svc','addon','coat'].forEach(n=>f[n]&&f[n].addEventListener('change',calc));
+    const C=<?php $cm = []; foreach (client_index() as $k => $c) { $dd = []; foreach ($c['b'] as $b) if ($b['status'] !== 'cancelled' && $b['bdate'] < $todayS) $dd[$b['bdate']] = 1; $n = count($dd) + (int)($c['c']['prev'] ?? 0); $cm[$k] = ['n' => $c['name'], 'p' => (string)(reset($c['pets']) ?: ''), 'v' => $n, 'r' => ($n > 0 || $c['c']) ? 1 : 0, 'o' => mb_strimwidth((string)($c['c']['note'] ?? ''), 0, 120, '…')]; } echo json_encode($cm ?: new stdClass, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?>;
+    f.phone.addEventListener('input',()=>{const k=f.phone.value.replace(/\D/g,'').slice(-9),h=document.getElementById('cliHint'),c=k.length===9?C[k]:null;
+      if(!c){h.innerHTML=k.length===9?'<span class="cbadge new">Nowy klient</span>':'';return}
+      h.innerHTML=(c.r?'<span class="cbadge reg">⭐ Stały klient'+(c.v?' · '+(c.v+1)+'. wizyta':'')+'</span> ':'')+(c.n?' '+c.n.replace(/</g,'&lt;'):'')+(c.o?'<br>📝 '+c.o.replace(/</g,'&lt;'):'');
+      if(!f.name.value&&c.n)f.name.value=c.n;
+      if(!f.breed.value&&c.p){const b=B.breeds.find(x=>c.p.toLowerCase().startsWith(x.n.toLowerCase()));if(b){f.breed.value=b.n;calc()}}});f.breed.addEventListener('input',()=>{if(B.breeds.some(x=>nr(x.n)===nr(f.breed.value)))calc()});
+  })();
+  </script>
 
 <?php elseif ($tab === 'site'): site_editor_view(); ?>
 <?php elseif ($tab === 'settings'): settings_view(); ?>
@@ -738,11 +877,18 @@ $f = flash();
 <?php endif; ?>
 </main>
 <script>
+/* „Zapisz i wyślij SMS” przy zmianie terminu */
+document.addEventListener('click',e=>{const a=e.target.closest('a.rsms');if(!a)return;e.preventDefault();
+  const f=a.closest('form');if(!f.reportValidity())return;const d=f.date.value,t=f.time.value;
+  const M=['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'],[y,m,dd]=d.split('-').map(Number);
+  const body='Dzień dobry, proponujemy nowy termin wizyty: '+dd+' '+M[m-1]+' o godz. '+t+'. Jeśli nie pasuje, prosimy o informację. KamaGrooming';
+  a.textContent='Zapisuję…';fetch(location.pathname,{method:'POST',body:(fd=>(fd.append('nosms','1'),fd))(new FormData(f)),credentials:'same-origin'}).catch(()=>{}).finally(()=>{location.href=a.getAttribute('href')+'?&body='+encodeURIComponent(body);setTimeout(()=>location.reload(),1500)});});
 /* „Potwierdź z SMS”: zapisuje potwierdzenie w panelu i od razu otwiera SMS do klienta */
 document.addEventListener('click',e=>{const a=e.target.closest('a.csms');if(!a)return;e.preventDefault();
   const f=a.closest('form');a.textContent='Otwieram SMS…';
-  fetch(location.pathname,{method:'POST',body:new FormData(f),credentials:'same-origin'}).catch(()=>{}).finally(()=>{location.href=a.getAttribute('href');setTimeout(()=>location.reload(),1500)});});
+  fetch(location.pathname,{method:'POST',body:(fd=>(fd.append('nosms','1'),fd))(new FormData(f)),credentials:'same-origin'}).catch(()=>{}).finally(()=>{location.href=a.getAttribute('href');setTimeout(()=>location.reload(),1500)});});
 </script>
+<?= clients_assets() ?>
 </body></html>
 <?php
 function time_list(string $name, array $times): string
@@ -758,7 +904,7 @@ function time_list_js(): string
 function page_head(string $title): void { ?>
 <!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1c1510"><title><?= h($title) ?> · Panel KamaGrooming</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500&display=swap"><link rel="icon" href="../ikony/favicon-32.png"><link rel="apple-touch-icon" href="../ikony/apple-touch-icon.png">
+<link rel="stylesheet" href="../fonts/fonts.css"><link rel="icon" href="../ikony/favicon-32.png"><link rel="apple-touch-icon" href="../ikony/apple-touch-icon.png">
 <style>
 :root{--ink:#1c1510;--plum:#2a2018;--plum2:#352a20;--gold:#cfa75e;--hi:#f3dca6;--cream:#f5ede0;--muted:#b9a993;--line:rgba(207,167,94,.28);--ok:#7fc79a;--warn:#e9b44c;--bad:#f0a3b8}
 *{box-sizing:border-box}body{margin:0;background:var(--ink);color:var(--cream);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -865,6 +1011,26 @@ i.h{background:#b98cf0}
 .redit[open]{order:10;flex-basis:100%;width:100%}.redit summary{list-style:none;display:inline-flex}.redit summary::-webkit-details-marker{display:none}.redit[open] summary{margin-bottom:10px}
 .linkhint{display:block;margin-top:2px;font-size:.8rem;line-height:1.45;color:var(--muted);text-transform:none;letter-spacing:0}.linkhint b{color:var(--hi);font-weight:600}
 @media (max-width:520px){.grid{grid-template-columns:1fr}}
+.ppic{flex:none;display:block;width:64px;height:64px;border-radius:12px;overflow:hidden;border:1px solid var(--gold)}.ppic img{width:100%;height:100%;object-fit:cover;display:block}.pet .ppic{width:84px;height:84px;margin-top:6px}
+.resch[open]{flex-basis:100%;width:100%;order:5}.resch summary{list-style:none}.resch summary::-webkit-details-marker{display:none}.resch[open] summary{display:none}
+.rform{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--ink)}.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chgbox.rem summary{list-style:none;cursor:pointer}.chgbox.rem summary::-webkit-details-marker{display:none}.chgbox.rem h2{margin:0}.chgbox.rem[open] h2{margin-bottom:6px}.sz.ok{background:rgba(127,199,154,.18);color:var(--ok)}
+.smsbox{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:10px;border:1px solid var(--gold)}
+.late{margin:6px 0;padding:8px 12px;border-radius:10px;background:rgba(233,180,76,.16);border:1px solid var(--warn);color:var(--hi);font-size:.9rem}
+.bsearch{width:100%;margin:6px 0 10px}
+.btable{display:grid;gap:6px}.bhead,.brow{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(86px,1fr) 70px 70px 34px;gap:6px;align-items:center}
+.bhead{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 2px}
+.brow input,.brow select{padding:8px 9px;min-width:0}.brow .rm{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.btable.sz .brow{grid-template-columns:minmax(0,2fr) 80px 80px}
+label[hidden],#coatL[hidden]{display:none!important}
+.noz{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:8px;font-size:.82rem;color:var(--muted)}.noz label{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:5px;color:var(--cream);font-size:.85rem}.noz input{width:18px;height:18px;accent-color:var(--gold)}
+.bvar{grid-column:1/-1;margin:-2px 0 4px}.bvar summary{cursor:pointer;font-size:.72rem;color:var(--muted);opacity:.7;list-style:none;display:inline-block}.bvar[open] summary{color:var(--gold);opacity:1;font-size:.8rem}.bvar summary::-webkit-details-marker{display:none}.bvar textarea{width:100%;margin-top:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--ink);color:var(--cream);font:inherit;font-size:15px}.bvar small{display:block;color:var(--muted);font-size:.74rem;margin-top:4px}.btable.sz .bl{font-size:.9rem;color:var(--cream)}
+.card2{border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px;background:var(--ink)}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sgrid.three{grid-template-columns:repeat(3,1fr)}.sgrid label{font-size:.78rem}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.wrow2{display:grid;grid-template-columns:minmax(0,1.4fr) 1fr auto 1fr;gap:8px;align-items:center;margin-top:10px;padding-bottom:10px;border-bottom:1px dashed var(--line)}.wrow2 .gridl{grid-column:1/-1;font-size:.78rem}.wrow2 .sw{padding:8px 10px}
+@media (max-width:560px){.bhead{display:none}.btable:not(.sz) .brow{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) 34px;row-gap:5px;padding:8px 0;border-bottom:1px dashed var(--line)}.btable:not(.sz) .brow input:first-child{grid-column:1/-1}.sgrid.three{grid-template-columns:1fr}.wrow2{grid-template-columns:1fr 1fr auto 1fr}.wrow2 .sw{grid-column:1/-1}}
+.sz{font-size:.72rem;font-weight:600;letter-spacing:.04em;padding:1px 8px;border-radius:99px;background:rgba(255,255,255,.08);color:var(--muted);white-space:nowrap}.sz.big{background:var(--warn);color:var(--ink)}
 .chgbox.pend{border-color:var(--warn);background:linear-gradient(135deg,rgba(233,180,76,.16),rgba(233,180,76,.04))}.chgbox.pend h2 span{background:var(--warn)}
 .sx summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-size:1.05rem;color:var(--hi)}.sx summary::-webkit-details-marker{display:none}
 .sx summary em.off{font-style:normal;font-size:.72rem;color:var(--ink);background:var(--muted);border-radius:99px;padding:1px 9px}

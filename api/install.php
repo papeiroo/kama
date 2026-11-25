@@ -28,7 +28,7 @@ if (!is_configured()) {
                     "'host' => 'localhost'" => "'host' => " . var_export($dh, true),
                     "'NAZWA_BAZY'" => var_export($dn, true), "'UZYTKOWNIK_BAZY'" => var_export($du, true), "'HASLO_BAZY'" => var_export($dp, true),
                     "'notify_email' => 'kontakt@kamagrooming.pl'" => "'notify_email' => " . var_export($mail, true),
-                    "'from_email'   => 'kontakt@kamagrooming.pl'" => "'from_email'   => " . var_export('rezerwacje@' . $bare, true),
+                    "'from_email'   => 'kontakt@kamagrooming.pl'" => "'from_email'   => " . var_export('kontakt@' . $bare, true),
                     "'site_url'     => 'https://www.kamagrooming.pl'" => "'site_url'     => " . var_export(($https ? 'https://' : 'http://') . $host, true),
                 ];
                 $cfg = strtr($tpl, $rep);
@@ -48,15 +48,15 @@ if (!is_configured()) {
             $tail = $sqlite ? '' : ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
             db()->exec("CREATE TABLE IF NOT EXISTS bookings (
                 id $id, bdate VARCHAR(10) NOT NULL, btime VARCHAR(5) NOT NULL, name VARCHAR(120) NOT NULL,
-                phone VARCHAR(20) NULL, email VARCHAR(160) NULL, service VARCHAR(160) NULL, pet VARCHAR(160) NULL,
+                phone VARCHAR(20) NULL, email VARCHAR(160) NULL, service VARCHAR(160) NULL, pet VARCHAR(160) NULL, size VARCHAR(10) NULL, photo VARCHAR(80) NULL, dur INT NULL, price INT NULL,
                 status VARCHAR(12) NOT NULL DEFAULT 'pending', slot_key VARCHAR(20) NULL UNIQUE, source VARCHAR(10) NOT NULL DEFAULT 'www',
                 ip VARCHAR(45) NULL, created_at VARCHAR(20) NOT NULL,
-                mtoken VARCHAR(64) NULL, chg VARCHAR(10) NULL, chg_from VARCHAR(20) NULL, chg_at VARCHAR(20) NULL, chg_seen INT NOT NULL DEFAULT 1
+                mtoken VARCHAR(64) NULL, chg VARCHAR(10) NULL, chg_from VARCHAR(20) NULL, chg_at VARCHAR(20) NULL, chg_seen INT NOT NULL DEFAULT 1, rem_sms INT NOT NULL DEFAULT 0, rem_mail INT NOT NULL DEFAULT 0
             )$tail");
-            db()->exec("CREATE TABLE IF NOT EXISTS blocks (id $id, bdate VARCHAR(10) NOT NULL, btime VARCHAR(5) NULL, note VARCHAR(160) NULL, created_at VARCHAR(20) NOT NULL)$tail");
+            db()->exec("CREATE TABLE IF NOT EXISTS blocks (id $id, bdate VARCHAR(10) NOT NULL, btime VARCHAR(5) NULL, bend VARCHAR(5) NULL, note VARCHAR(160) NULL, created_at VARCHAR(20) NOT NULL)$tail");
             db()->exec("CREATE TABLE IF NOT EXISTS settings (k VARCHAR(64) NOT NULL PRIMARY KEY, v MEDIUMTEXT NULL)$tail");
             try { db()->exec('CREATE INDEX idx_bdate ON bookings (bdate)'); } catch (Throwable $ex) {}
-            setting('schema_manage', '2');
+            setting('schema_manage', '7');
             if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $p = (string)($_POST['p'] ?? '');
                 if (mb_strlen($p) < 8) $msg = 'Hasło musi mieć co najmniej 8 znaków.';

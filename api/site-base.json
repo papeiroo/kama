@@ -3,7 +3,13 @@
   "phone": "799 013 911",
   "fb": "https://www.facebook.com/share/1Ejamk7F3v/",
   "street": "ul. Dworcowa 16B",
-  "city": "89-100 Nakło nad Notecią"
+  "city": "89-100 Nakło nad Notecią",
+  "company": "Kama Grooming Psi Fryzjer Kamila Koth",
+  "owner": "Kamila Koth",
+  "nip": "5581567997",
+  "regon": "544914121",
+  "hq": "",
+  "email": "kontakt@kamagrooming.pl"
  },
  "seo": {
   "title": "KamaGrooming – Salon Pielęgnacji Psów",
@@ -47,9 +53,16 @@
    "Nakło nad Notecią"
   ],
   "chips": [
+   "Pielęgnacja kompleksowa",
    "Strzyżenie & stylizacja",
    "Kąpiele ozonowe",
+   "SPA z hydromasażem",
    "Wyczesywanie podszerstka",
+   "Rozczesywanie kołtunów",
+   "Obcinanie pazurków",
+   "Czyszczenie uszu",
+   "Mieszańce i kundelki",
+   "Małe, średnie i duże rasy",
    "Szczenięta mile widziane"
   ],
   "services": [
@@ -121,7 +134,7 @@
   "hours": [
    {
     "d": "Poniedziałek – Piątek",
-    "h": "9:00 – 17:00"
+    "h": "9:00 – 18:00"
    },
    {
     "d": "Sobota",

@@ -18,8 +18,17 @@ try {
     $phone   = trim((string)($in['phone'] ?? ''));
     $email   = trim((string)($in['email'] ?? ''));
     $service = trim((string)($in['service'] ?? ''));
-    $pet     = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($in['pet'] ?? ''))), 0, 160);
+    $pet     = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($in['pet'] ?? ''))), 0, 120);
+    $breed   = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($in['breed'] ?? ''))), 0, 80);
 
+    if (mb_strlen($breed) < 2)                                   json_out(['error' => 'Podaj rasę psa.'], 422);
+    // Cena i czas wizyty liczone na serwerze z cennika salonu (rasa + usługa), nie z przeglądarki
+    $q = quote($breed, (string)($in['size'] ?? ''), (string)($in['svc'] ?? 'full'), !empty($in['addon']), isset($in['coat']) && is_numeric($in['coat']) ? (int)$in['coat'] : -1);
+    if (isset($q['error']))                                      json_out(['error' => $q['error']], 422);
+    $size = $q['size']; $dur = (int)$q['min']; $price = (int)$q['price'];
+    if ($q['breed']) $breed = $q['breed'];
+    $service = $q['service'] . ' · ok. ' . dur_txt($dur) . ' · ' . $price . ' zł';
+    $pet = mb_substr(trim($breed . ($pet !== '' ? ' · ' . $pet : '')), 0, 160); // w panelu: „rasa · imię, waga”
     if (empty($in['consent']))                                   json_out(['error' => 'Zaznacz zgodę na kontakt.'], 422);
     if (mb_strlen($name) < 2 || mb_strlen($name) > 120)          json_out(['error' => 'Podaj swoje imię.'], 422);
     $digits = preg_replace('/[\s\-()]/', '', $phone);
@@ -28,7 +37,7 @@ try {
                                                                  json_out(['error' => 'Adres e-mail jest niepoprawny.'], 422);
     $service = mb_substr($service, 0, 160);
 
-    if ($p = slot_problem($date, $time))                         json_out(['error' => $p[0]], $p[1]);
+    if ($p = start_problem($date, $time, $dur, $size))           json_out(['error' => $p[0]], $p[1]);
     $today = new DateTime('today');
 
     // Ochrona przed spamem: max 3 rezerwacje na godzinę z jednego adresu IP i max 3 przyszłe na jeden numer
@@ -44,18 +53,22 @@ try {
     // Tajny kod, dzięki któremu klient może sam odwołać lub przełożyć wizytę przez stronę
     ensure_manage_cols();
     $tok = bin2hex(random_bytes(16));
+    $photo = null;
+    if (is_string($in['photo'] ?? null) && $in['photo'] !== '') $photo = save_jpeg_dataurl($in['photo'], 'pets');
     try {
-        db()->prepare('INSERT INTO bookings (bdate, btime, name, phone, email, service, pet, status, slot_key, source, ip, created_at, mtoken)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, \'pending\', ?, \'www\', ?, ?, ?)')
-            ->execute([$date, $time, $name, $digits, $email ?: null, $service ?: null, $pet ?: null, "$date $time", $ip, date('Y-m-d H:i:s'), hash('sha256', $tok)]);
+        db()->prepare('INSERT INTO bookings (bdate, btime, name, phone, email, service, pet, size, photo, dur, price, status, slot_key, source, ip, created_at, mtoken)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'pending\', ?, \'www\', ?, ?, ?)')
+            ->execute([$date, $time, $name, $digits, $email ?: null, $service ?: null, $pet ?: null, $size, $photo, $dur, $price, "$date $time", $ip, date('Y-m-d H:i:s'), hash('sha256', $tok)]);
         $ref = db()->lastInsertId() . '.' . $tok;
     } catch (PDOException $e) {
+        if ($photo) delete_upload($photo);
         if ($e->getCode() === '23000') json_out(['error' => 'Ten termin został właśnie zajęty.'], 409);
         throw $e;
     }
 
-    // Powiadomienie dla salonu
-    $when = pl_date($date) . ', godz. ' . $time;
+    // Powiadomienie dla salonu (wielkość psa dopisana do opisu psa)
+    $pet = trim(($pet ? $pet . ' · ' : '') . size_label($size) . ($photo ? ' · 📸 zdjęcie psa w panelu' : ''));
+    $when = pl_date($date) . ', godz. ' . $time . '–' . m2hm(hm2m($time) + $dur);
     $tel  = phone_pretty($digits);
     $calLink = gcal_add_link($date, $time, "Grooming: " . ($pet ?: $name), "Właściciel: $name\nTelefon: $tel" . ($pet ? "\nPies: $pet" : '') . ($service ? "\nUsługa: $service" : '') . ($email ? "\nE-mail: $email" : ''));
     $body = "ZADZWOŃ DO KLIENTA\n"

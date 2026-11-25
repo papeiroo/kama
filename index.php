@@ -36,6 +36,7 @@ try {
     }
     // pełne dane dla skryptu strony (listy, kontakt, ukryte sekcje)
     $json = json_encode($s, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
-    $html = preg_replace('#<script>\s*document\.documentElement#', "<script>window.__SITE=$json;</script>\n$0", $html, 1);
+    $bj = json_encode(breeds_get(), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+    $html = preg_replace('#<script>\s*document\.documentElement#', "<script>window.__SITE=$json;window.__BREEDS=$bj;</script>\n$0", $html, 1);
 } catch (Throwable $ex) { /* bez bazy: zwykła strona z domyślnymi treściami */ }
 echo $html;

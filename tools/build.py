@@ -15,7 +15,9 @@ for m in re.finditer(r'<div data-tp="(\w+)">(.*?)</div>',s,re.S):
 base['t']=T
 base['seo']['desc']=html.unescape(re.search(r'<meta name="description" content="([^"]*)"',s).group(1))
 json.dump(base,open(K+'/api/site-default.json','w',encoding='utf-8'),ensure_ascii=False,indent=1)
-assert s.count('/*GAL*/[]')==1 and s.count('/*SITEDEF*/null')==1
+assert s.count('/*GAL*/[]')==1 and s.count('/*SITEDEF*/null')==1 and s.count('/*BREEDS*/null')==1
+br=json.load(open(K+'/api/breeds-default.json',encoding='utf-8'))
+s=s.replace('/*BREEDS*/null',json.dumps(br,ensure_ascii=False,separators=(',',':')).replace('</','<\\/'))
 s=s.replace('/*GAL*/[]',json.dumps(g,ensure_ascii=False,separators=(',',':')))
 s=s.replace('/*SITEDEF*/null',json.dumps(base,ensure_ascii=False,separators=(',',':')).replace('</','<\\/'))
 open(K+'/index.html','w',encoding='utf-8').write(s)

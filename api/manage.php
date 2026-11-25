@@ -8,7 +8,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') json_out(['error' => 'Metoda 
 
 function view_of(array $r): array
 {
-    return ['date' => $r['bdate'], 'time' => $r['btime'], 'status' => $r['status'], 'can_change' => can_manage($r), 'hours' => manage_hours()];
+    return ['date' => $r['bdate'], 'time' => $r['btime'], 'status' => $r['status'], 'can_change' => can_manage($r), 'hours' => manage_hours(), 'size' => $r['size'] ?? null, 'dur' => (int)($r['dur'] ?? 0) ?: 120];
 }
 
 try {
@@ -45,7 +45,7 @@ try {
     if ($action === 'move') {
         $date = (string)($in['date'] ?? ''); $time = (string)($in['time'] ?? '');
         if ($date === $r['bdate'] && $time === $r['btime']) json_out(['error' => 'To jest ten sam termin.'], 422);
-        if ($p = slot_problem($date, $time)) json_out(['error' => $p[0]], $p[1]);
+        if ($p = start_problem($date, $time, (int)($r['dur'] ?? 0) ?: 120, (string)($r['size'] ?? ''), (int)$r['id'])) json_out(['error' => $p[0]], $p[1]);
         try {
             db()->prepare("UPDATE bookings SET bdate = ?, btime = ?, slot_key = ?, status = 'pending', chg = 'move', chg_from = ?, chg_at = ?, chg_seen = 0 WHERE id = ?")
                 ->execute([$date, $time, "$date $time", $r['bdate'] . ' ' . $r['btime'], $now, $r['id']]);
